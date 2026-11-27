@@ -42,7 +42,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [signing, setSigning] = useState(false);
   const [completionVerified, setCompletionVerified] = useState(false);
   const readyRequestedRef = useRef<string | null>(null);
