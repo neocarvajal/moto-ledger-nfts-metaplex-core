@@ -7,6 +7,7 @@ import {
   getBase58Decoder,
   getBase64Encoder,
   type Base58EncodedBytes,
+  type Instruction,
 } from "@solana/kit";
 import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import {
@@ -17,6 +18,13 @@ import {
 } from "@solana-program/token-2022";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
+import { useCluster } from "../cluster-context";
+import {
+  buildRecognitionAssetInstructions,
+  readRecognitionConfig,
+  recognitionAlreadyIssued,
+  recognitionMilestone,
+} from "../../lib/moto-ledger/recognitions";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
 import {
   deriveAsociacionClientePda,
@@ -61,6 +69,7 @@ type SaleConfirmation = {
   saleAddress: string;
   customerName: string;
   motorcycle: string;
+  recognition: { milestone: number; asset: string } | null;
 };
 type SaleDetails = {
   sale: SaleRecord;
@@ -98,6 +107,7 @@ export function SalesManagement({
 }) {
   const client = useAppClient();
   const connected = useConnectedWallet(client);
+  const { cluster, getExplorerUrl } = useCluster();
   const [motorcycles, setMotorcycles] = useState<MotorcycleRecord[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [loyaltyTokenSymbol, setLoyaltyTokenSymbol] = useState<string | null>(null);
@@ -433,13 +443,50 @@ export function SalesManagement({
       let awardedPoints: bigint | null = null;
       let awardedTokenSymbol: string | null = null;
       let awardedWallet: string | null = null;
+      let awardedRecognition: { milestone: number; asset: string } | null = null;
+      let recognitionInstructions: Instruction[] = [];
+      let customerWalletAddress: string | null = null;
       let reconciledOnChain = false;
+
+      // NFT milestones are counted from Venta records for this dealership/customer pair.
+      // Cliente.totalMotosCliente is global across dealerships and is not suitable here.
+      if (walletInfo.value) {
+        const linkedWallet = await client.registro.accounts.walletCliente.fetch(walletCliente);
+        customerWalletAddress = linkedWallet.data.wallet;
+      }
+      const recognitionConfig = readRecognitionConfig(owner, dealerAddress, cluster);
+      const nextPurchaseCount = sales.filter((sale) => sale.data.cliente === cliente).length + 1;
+      const milestone = recognitionMilestone(nextPurchaseCount);
+      if (recognitionConfig && customerWalletAddress && milestone) {
+        const alreadyIssued = await recognitionAlreadyIssued(
+          cluster,
+          recognitionConfig.collection,
+          cliente,
+          dealerAddress,
+          milestone
+        );
+        if (!alreadyIssued) {
+          const built = await buildRecognitionAssetInstructions({
+            cluster,
+            owner,
+            ownerSigner: connected.signer,
+            collection: recognitionConfig.collection,
+            metadataUri: recognitionConfig.metadataUri,
+            customerWallet: customerWalletAddress,
+            customer: cliente,
+            dealership: dealerAddress,
+            sale: venta,
+            milestone,
+          });
+          recognitionInstructions = built.instructions;
+          awardedRecognition = { milestone, asset: built.asset };
+        }
+      }
 
       try {
         if (walletInfo.value && loyaltyInfo.value) {
-          const linkedWallet = await client.registro.accounts.walletCliente.fetch(walletCliente);
           const loyaltyProgram = await client.registro.accounts.programaFidelidad.fetch(programaFidelidad);
-          const customerWallet = linkedWallet.data.wallet;
+          const customerWallet = customerWalletAddress!;
           const mint = loyaltyProgram.data.mint;
           try {
             const mintAccount = await fetchMint(client.rpc, mint);
@@ -480,13 +527,20 @@ export function SalesManagement({
 
           // ATA creation (when needed), sale registration and reward issuance
           // are submitted atomically: any failure rolls back all three operations.
+          // Sale, Token-2022 rewards and any earned Core recognition share one atomic transaction.
           result = await client.sendTransaction([
             createAtaInstruction,
             saleInstruction,
             rewardInstruction,
+            ...recognitionInstructions,
           ]);
           awardedPoints = loyaltyProgram.data.puntosPorVenta;
           awardedWallet = customerWallet;
+        } else if (recognitionInstructions.length > 0) {
+          result = await client.sendTransaction([
+            saleInstruction,
+            ...recognitionInstructions,
+          ]);
         } else {
           result = await saleInstruction.sendTransaction();
         }
@@ -503,7 +557,13 @@ export function SalesManagement({
               client.rpc.getAccountInfo(venta, { encoding: "base64" }).send(),
               client.rpc.getAccountInfo(puntosVenta, { encoding: "base64" }).send(),
             ]);
-            if (saleInfo.value) {
+            const assetInfo = awardedRecognition
+              ? await client.rpc.getAccountInfo(
+                  address(awardedRecognition.asset),
+                  { encoding: "base64" }
+                ).send()
+              : null;
+            if (saleInfo.value && (!awardedRecognition || assetInfo?.value)) {
               reconciledOnChain = true;
               if (rewardInfo.value) {
                 const rewardRecord = await client.registro.accounts.puntosVenta.fetch(puntosVenta);
@@ -519,19 +579,20 @@ export function SalesManagement({
         if (!reconciledOnChain) throw sendError;
       }
 
+      const recognitionMessage = awardedRecognition
+        ? `Reconocimiento NFT de ${awardedRecognition.milestone} ${awardedRecognition.milestone === 1 ? "compra" : "compras"} emitido.`
+        : "";
+      const successMessage = [
+        "Venta registrada correctamente en Solana.",
+        awardedPoints !== null
+          ? `${formatAmount(awardedPoints)} puntos de fidelización emitidos.`
+          : "",
+        recognitionMessage,
+      ].filter(Boolean).join(" ");
       if (result) {
-        notifyTransactionSuccess(
-          awardedPoints === null
-            ? "Venta registrada correctamente en Solana."
-            : `Venta registrada y ${formatAmount(awardedPoints)} puntos de fidelización emitidos.`,
-          result.context.signature
-        );
+        notifyTransactionSuccess(successMessage, result.context.signature);
       } else {
-        toast.success(
-          awardedPoints === null
-            ? "Venta confirmada en Solana. La wallet no devolvió la firma, pero el registro ya existe."
-            : `Venta confirmada y ${formatAmount(awardedPoints)} puntos emitidos. La wallet no devolvió la firma, pero ambas cuentas existen en Solana.`
-        );
+        toast.success(`${successMessage} La wallet no devolvió la firma, pero la venta y sus reconocimientos ya existen en Solana.`);
       }
       setLastSaleConfirmation({
         points: awardedPoints,
@@ -541,6 +602,7 @@ export function SalesManagement({
         saleAddress: venta,
         customerName: customer.data.nombreCliente,
         motorcycle: `${motorcycle.data.marca} ${motorcycle.data.modelo} · ${motorcycle.data.serial}`,
+        recognition: awardedRecognition,
       });
       setCedula("");
       setPrice("");
@@ -716,6 +778,17 @@ export function SalesManagement({
               </div>
             ) : (
               <p className="mt-3 rounded-lg bg-white px-3 py-2 text-[10px] text-[#68717b]">La venta quedó registrada, pero no se encontró un comprobante de emisión de puntos para esta operación.</p>
+            )}
+            {lastSaleConfirmation.recognition && (
+              <div className="mt-3 rounded-lg border border-[#d8e5f5] bg-white p-4">
+                <p className="text-[9px] font-bold tracking-[0.12em] text-[#42658a]">RECONOCIMIENTO NFT EMITIDO</p>
+                <p className="mt-1 text-[12px] font-bold text-[#252a30]">
+                  {lastSaleConfirmation.recognition.milestone} {lastSaleConfirmation.recognition.milestone === 1 ? "compra" : "compras"}
+                </p>
+                <a href={getExplorerUrl(`address/${lastSaleConfirmation.recognition.asset}`)} target="_blank" rel="noopener noreferrer" className="mt-2 block break-all font-mono text-[9px] text-[#42658a] underline decoration-dotted underline-offset-2">
+                  Ver Asset en Explorer: {lastSaleConfirmation.recognition.asset} ↗
+                </a>
+              </div>
             )}
             <div className="mt-3 flex flex-wrap gap-3 text-[9px] font-semibold">
               <a href={"https://explorer.solana.com/address/" + lastSaleConfirmation.saleAddress + "?cluster=devnet"} target="_blank" rel="noopener noreferrer" className="text-[#16845a] underline decoration-dotted underline-offset-2">Ver venta en Explorer ↗</a>
