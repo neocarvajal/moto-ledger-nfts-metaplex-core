@@ -37,6 +37,7 @@ type CustomerProgress = {
   name: string;
   purchases: number;
   wallet: string | null;
+  milestoneSales: Partial<Record<1 | 3 | 5, string>>;
 };
 
 function shortAddress(value: string) {
@@ -105,16 +106,24 @@ export function RecognitionManagement({
         }
       ).send();
 
-      const decodedSales = sales.map((item) =>
-        getVentaDecoder().decode(getBase64Encoder().encode(item.account.data[0]))
-      );
-      const counts = new Map<string, number>();
-      for (const sale of decodedSales) {
-        counts.set(sale.cliente, (counts.get(sale.cliente) ?? 0) + 1);
+      const salesByCustomer = new Map<
+        string,
+        Array<{ address: string; fechaVenta: bigint }>
+      >();
+      for (const item of sales) {
+        const sale = getVentaDecoder().decode(
+          getBase64Encoder().encode(item.account.data[0])
+        );
+        const customerSales = salesByCustomer.get(sale.cliente) ?? [];
+        customerSales.push({ address: item.pubkey, fechaVenta: sale.fechaVenta });
+        salesByCustomer.set(sale.cliente, customerSales);
       }
 
       const progress = await Promise.all(
-        [...counts.entries()].map(async ([customerAddress, purchases]) => {
+        [...salesByCustomer.entries()].map(async ([customerAddress, customerSales]) => {
+          customerSales.sort((a, b) =>
+            a.fechaVenta < b.fechaVenta ? -1 : a.fechaVenta > b.fechaVenta ? 1 : 0
+          );
           const customer = await client.registro.accounts.cliente.fetch(
             address(customerAddress)
           );
@@ -131,8 +140,13 @@ export function RecognitionManagement({
           return {
             address: customerAddress,
             name: customer.data.nombreCliente,
-            purchases,
+            purchases: customerSales.length,
             wallet,
+            milestoneSales: {
+              1: customerSales[0]?.address,
+              3: customerSales[2]?.address,
+              5: customerSales[4]?.address,
+            },
           };
         })
       );
@@ -255,7 +269,7 @@ export function RecognitionManagement({
         customerWallet: customer.wallet,
         customer: customer.address,
         dealership: concesionario,
-        sale: "pendiente",
+        sale: customer.milestoneSales[milestone as 1 | 3 | 5] ?? "",
         milestone: milestone as 1 | 3 | 5,
       });
       const before = await client.rpc.getBalance(address(owner)).send();
