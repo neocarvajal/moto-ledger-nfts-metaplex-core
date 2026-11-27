@@ -73,7 +73,7 @@ Después de crear o vincular la colección, carga las tres imágenes en **Imáge
 - **Hito 3:** CLIENTE FRECUENTE.
 - **Hito 5:** CLIENTE DESTACADO.
 
-Puedes seleccionar las tres imágenes y pulsar **Subir los tres hitos**, o subir cada una por separado. Cada carga crea su propio archivo de imagen y JSON público en Pinata; las URI quedan guardadas por concesionario y red. También puedes reemplazar un hito cargando una nueva imagen individualmente. La wallet owner autoriza cada carga mediante firma de mensaje; `PINATA_JWT` permanece exclusivamente en el servidor.
+Las tres imágenes JPG incluidas en el repositorio se cargan por defecto desde `assets/recognitions/milestone-1.jpg`, `assets/recognitions/milestone-3.jpg` y `assets/recognitions/milestone-5.jpg`. No necesitas seleccionarlas manualmente; el selector permite reemplazar cualquiera por otra imagen JPG. Pulsa **Subir los tres hitos** para cargar las pendientes en una sola operación, o sube cada una por separado. Cada carga crea su propio archivo de imagen y JSON público en Pinata; las URI quedan guardadas por concesionario y red. También puedes reemplazar un hito cargando una nueva imagen individualmente. La wallet owner autoriza cada carga mediante firma de mensaje; `PINATA_JWT` permanece exclusivamente en el servidor.
 
 El JSON incluye `name`, `symbol`, `description`, `image`, `properties.files` y atributos de plataforma/hito. Los datos de cliente, venta y concesionario no se incorporan a la metadata pública: los atributos específicos de la emisión se guardan en el Asset Metaplex Core.
 
