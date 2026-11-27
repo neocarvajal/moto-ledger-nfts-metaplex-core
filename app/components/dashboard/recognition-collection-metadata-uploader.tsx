@@ -60,7 +60,7 @@ export function RecognitionCollectionMetadataUploader({
     const timestamp = Date.now();
     const nonce = crypto.randomUUID().replaceAll("-", "");
     const network = cluster === "mainnet" ? "mainnet-beta" : "devnet";
-    const message = ["MotoLedger IPFS metadata upload", "wallet:" + owner, "dealership:" + dealership, "cluster:" + network, "timestamp:" + timestamp, "nonce:" + nonce].join("\\n");
+    const message = ["MotoLedger IPFS metadata upload", "wallet:" + owner, "dealership:" + dealership, "cluster:" + network, "timestamp:" + timestamp, "nonce:" + nonce].join("\n");
     const signature = await client.wallet.signMessage(new TextEncoder().encode(message));
     const body = new FormData();
     body.set("image", image); body.set("name", metadataName); body.set("symbol", metadataSymbol); body.set("description", metadataDescription);
