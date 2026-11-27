@@ -487,7 +487,7 @@ export function SalesManagement({
               owner,
               ownerSigner: connected.signer,
               collection: recognitionConfig.collection,
-              metadataUri: recognitionConfig.milestones[milestone].metadataUri,
+              metadataUri: recognitionConfig.milestones?.[milestone]?.metadataUri ?? "",
               customerWallet: customerWalletAddress,
               customer: cliente,
               dealership: dealerAddress,
