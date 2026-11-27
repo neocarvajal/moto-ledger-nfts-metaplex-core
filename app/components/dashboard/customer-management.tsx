@@ -50,6 +50,7 @@ export function CustomerManagement({
   const [loyaltyStatus, setLoyaltyStatus] = useState<"idle" | "loading" | "ready" | "unlinked" | "unavailable" | "outside_dealership">("idle");
 
   const loadCustomers = useCallback(async () => {
+    await Promise.resolve();
     if (!connected?.account.address || !concesionario) {
       setCustomers([]);
       return;
@@ -106,7 +107,7 @@ export function CustomerManagement({
     } finally {
       setLoadingCustomers(false);
     }
-  }, [client, connected?.account.address, concesionario]);
+  }, [client, connected, concesionario]);
 
   useEffect(() => {
     void loadCustomers();
