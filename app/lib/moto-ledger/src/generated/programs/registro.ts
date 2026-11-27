@@ -47,6 +47,7 @@ import {
   getProgramaFidelidadCodec,
   getPuntosVentaCodec,
   getReclamacionCodec,
+  getReconocimientoColeccionCodec,
   getRegistroGlobalCodec,
   getServicioCodec,
   getVentaCodec,
@@ -75,6 +76,8 @@ import {
   type PuntosVentaArgs,
   type Reclamacion,
   type ReclamacionArgs,
+  type ReconocimientoColeccion,
+  type ReconocimientoColeccionArgs,
   type RegistroGlobal,
   type RegistroGlobalArgs,
   type Servicio,
@@ -86,6 +89,7 @@ import {
 } from "../accounts";
 import {
   getActualizarMetadataFidelidadInstruction,
+  getActualizarMetadataReconocimientosInstruction,
   getActualizarPuntosFidelidadInstruction,
   getActualizarServicioCatalogoInstruction,
   getAgregarServicioCatalogoInstruction,
@@ -99,6 +103,7 @@ import {
   getReclamarGarantiaInstruction,
   getRegistrarAsociacionClienteInstruction,
   getRegistrarClienteInstruction,
+  getRegistrarColeccionReconocimientosInstruction,
   getRegistrarConcesionarioInstruction,
   getRegistrarMetadataFidelidadInstruction,
   getRegistrarMotoInstruction,
@@ -106,6 +111,7 @@ import {
   getRegistrarVentaInstruction,
   getVincularWalletClienteInstruction,
   parseActualizarMetadataFidelidadInstruction,
+  parseActualizarMetadataReconocimientosInstruction,
   parseActualizarPuntosFidelidadInstruction,
   parseActualizarServicioCatalogoInstruction,
   parseAgregarServicioCatalogoInstruction,
@@ -119,6 +125,7 @@ import {
   parseReclamarGarantiaInstruction,
   parseRegistrarAsociacionClienteInstruction,
   parseRegistrarClienteInstruction,
+  parseRegistrarColeccionReconocimientosInstruction,
   parseRegistrarConcesionarioInstruction,
   parseRegistrarMetadataFidelidadInstruction,
   parseRegistrarMotoInstruction,
@@ -126,6 +133,7 @@ import {
   parseRegistrarVentaInstruction,
   parseVincularWalletClienteInstruction,
   type ActualizarMetadataFidelidadInput,
+  type ActualizarMetadataReconocimientosInput,
   type ActualizarPuntosFidelidadInput,
   type ActualizarServicioCatalogoInput,
   type AgregarServicioCatalogoInput,
@@ -137,6 +145,7 @@ import {
   type InicializarCatalogoServiciosInput,
   type OtorgarPuntosInput,
   type ParsedActualizarMetadataFidelidadInstruction,
+  type ParsedActualizarMetadataReconocimientosInstruction,
   type ParsedActualizarPuntosFidelidadInstruction,
   type ParsedActualizarServicioCatalogoInstruction,
   type ParsedAgregarServicioCatalogoInstruction,
@@ -150,6 +159,7 @@ import {
   type ParsedReclamarGarantiaInstruction,
   type ParsedRegistrarAsociacionClienteInstruction,
   type ParsedRegistrarClienteInstruction,
+  type ParsedRegistrarColeccionReconocimientosInstruction,
   type ParsedRegistrarConcesionarioInstruction,
   type ParsedRegistrarMetadataFidelidadInstruction,
   type ParsedRegistrarMotoInstruction,
@@ -159,6 +169,7 @@ import {
   type ReclamarGarantiaInput,
   type RegistrarAsociacionClienteInput,
   type RegistrarClienteInput,
+  type RegistrarColeccionReconocimientosInput,
   type RegistrarConcesionarioInput,
   type RegistrarMetadataFidelidadInput,
   type RegistrarMotoInput,
@@ -179,6 +190,7 @@ export enum RegistroAccount {
   CanjeServicio,
   RegistroGlobal,
   Concesionario,
+  ReconocimientoColeccion,
   Moto,
   KilometrajeMoto,
   Garantia,
@@ -285,6 +297,17 @@ export function identifyRegistroAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([223, 214, 114, 209, 181, 54, 198, 151])
+      ),
+      0
+    )
+  ) {
+    return RegistroAccount.ReconocimientoColeccion;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([181, 97, 246, 128, 209, 179, 219, 228])
       ),
       0
@@ -377,6 +400,8 @@ export function identifyRegistroAccount(
 
 export enum RegistroInstruction {
   RegistrarConcesionario,
+  RegistrarColeccionReconocimientos,
+  ActualizarMetadataReconocimientos,
   ConfigurarGarantia,
   RegistrarMoto,
   RegistrarCliente,
@@ -412,6 +437,28 @@ export function identifyRegistroInstruction(
     )
   ) {
     return RegistroInstruction.RegistrarConcesionario;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([159, 134, 195, 254, 13, 46, 235, 95])
+      ),
+      0
+    )
+  ) {
+    return RegistroInstruction.RegistrarColeccionReconocimientos;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([196, 114, 214, 98, 22, 98, 232, 226])
+      ),
+      0
+    )
+  ) {
+    return RegistroInstruction.ActualizarMetadataReconocimientos;
   }
   if (
     containsBytes(
@@ -635,6 +682,12 @@ export type ParsedRegistroInstruction<
       instructionType: RegistroInstruction.RegistrarConcesionario;
     } & ParsedRegistrarConcesionarioInstruction<TProgram>)
   | ({
+      instructionType: RegistroInstruction.RegistrarColeccionReconocimientos;
+    } & ParsedRegistrarColeccionReconocimientosInstruction<TProgram>)
+  | ({
+      instructionType: RegistroInstruction.ActualizarMetadataReconocimientos;
+    } & ParsedActualizarMetadataReconocimientosInstruction<TProgram>)
+  | ({
       instructionType: RegistroInstruction.ConfigurarGarantia;
     } & ParsedConfigurarGarantiaInstruction<TProgram>)
   | ({
@@ -702,6 +755,20 @@ export function parseRegistroInstruction<TProgram extends string>(
       return {
         instructionType: RegistroInstruction.RegistrarConcesionario,
         ...parseRegistrarConcesionarioInstruction(instruction),
+      };
+    }
+    case RegistroInstruction.RegistrarColeccionReconocimientos: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: RegistroInstruction.RegistrarColeccionReconocimientos,
+        ...parseRegistrarColeccionReconocimientosInstruction(instruction),
+      };
+    }
+    case RegistroInstruction.ActualizarMetadataReconocimientos: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: RegistroInstruction.ActualizarMetadataReconocimientos,
+        ...parseActualizarMetadataReconocimientosInstruction(instruction),
       };
     }
     case RegistroInstruction.ConfigurarGarantia: {
@@ -870,6 +937,8 @@ export type RegistroPluginAccounts = {
     SelfFetchFunctions<RegistroGlobalArgs, RegistroGlobal>;
   concesionario: ReturnType<typeof getConcesionarioCodec> &
     SelfFetchFunctions<ConcesionarioArgs, Concesionario>;
+  reconocimientoColeccion: ReturnType<typeof getReconocimientoColeccionCodec> &
+    SelfFetchFunctions<ReconocimientoColeccionArgs, ReconocimientoColeccion>;
   moto: ReturnType<typeof getMotoCodec> & SelfFetchFunctions<MotoArgs, Moto>;
   kilometrajeMoto: ReturnType<typeof getKilometrajeMotoCodec> &
     SelfFetchFunctions<KilometrajeMotoArgs, KilometrajeMoto>;
@@ -892,6 +961,16 @@ export type RegistroPluginInstructions = {
     input: RegistrarConcesionarioInput,
     config?: { programAddress?: Address | HasAddress }
   ) => ReturnType<typeof getRegistrarConcesionarioInstruction> &
+    SelfPlanAndSendFunctions;
+  registrarColeccionReconocimientos: (
+    input: RegistrarColeccionReconocimientosInput,
+    config?: { programAddress?: Address | HasAddress }
+  ) => ReturnType<typeof getRegistrarColeccionReconocimientosInstruction> &
+    SelfPlanAndSendFunctions;
+  actualizarMetadataReconocimientos: (
+    input: ActualizarMetadataReconocimientosInput,
+    config?: { programAddress?: Address | HasAddress }
+  ) => ReturnType<typeof getActualizarMetadataReconocimientosInstruction> &
     SelfPlanAndSendFunctions;
   configurarGarantia: (
     input: ConfigurarGarantiaInput,
@@ -1024,6 +1103,10 @@ export function registroProgram(
             getRegistroGlobalCodec()
           ),
           concesionario: addSelfFetchFunctions(client, getConcesionarioCodec()),
+          reconocimientoColeccion: addSelfFetchFunctions(
+            client,
+            getReconocimientoColeccionCodec()
+          ),
           moto: addSelfFetchFunctions(client, getMotoCodec()),
           kilometrajeMoto: addSelfFetchFunctions(
             client,
@@ -1044,6 +1127,22 @@ export function registroProgram(
             addSelfPlanAndSendFunctions(
               client,
               getRegistrarConcesionarioInstruction(input, {
+                programAddress:
+                  instructionConfig?.programAddress ?? config.programAddress,
+              })
+            ),
+          registrarColeccionReconocimientos: (input, instructionConfig) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getRegistrarColeccionReconocimientosInstruction(input, {
+                programAddress:
+                  instructionConfig?.programAddress ?? config.programAddress,
+              })
+            ),
+          actualizarMetadataReconocimientos: (input, instructionConfig) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getActualizarMetadataReconocimientosInstruction(input, {
                 programAddress:
                   instructionConfig?.programAddress ?? config.programAddress,
               })

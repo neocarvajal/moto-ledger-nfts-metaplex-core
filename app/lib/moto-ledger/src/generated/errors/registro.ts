@@ -15,88 +15,92 @@ import {
 } from "@solana/kit";
 import { REGISTRO_PROGRAM_ADDRESS } from "../programs";
 
+/** MetadataUriInvalida: La URI de metadata debe ser HTTPS y no superar 200 bytes */
+export const REGISTRO_ERROR__METADATA_URI_INVALIDA = 0x1770; // 6000
+/** ColeccionInvalida: La coleccion de reconocimientos no es valida */
+export const REGISTRO_ERROR__COLECCION_INVALIDA = 0x1771; // 6001
 /** NivInvalido: Error, el serial N.I.V debe tener una longitud de 17 caracteres */
-export const REGISTRO_ERROR__NIV_INVALIDO = 0x1770; // 6000
+export const REGISTRO_ERROR__NIV_INVALIDO = 0x1772; // 6002
 /** PlacaInvalida: Error, la placa debe tener una longitud de 7 caracteres */
-export const REGISTRO_ERROR__PLACA_INVALIDA = 0x1771; // 6001
+export const REGISTRO_ERROR__PLACA_INVALIDA = 0x1773; // 6003
 /** Unauthorized: No tienes autorizacion para realizar esta operacion */
-export const REGISTRO_ERROR__UNAUTHORIZED = 0x1772; // 6002
+export const REGISTRO_ERROR__UNAUTHORIZED = 0x1774; // 6004
 /** DuracionGarantiaInvalida: La duracion de la garantia debe ser mayor a cero */
-export const REGISTRO_ERROR__DURACION_GARANTIA_INVALIDA = 0x1773; // 6003
+export const REGISTRO_ERROR__DURACION_GARANTIA_INVALIDA = 0x1775; // 6005
 /** KilometrajeGarantiaInvalido: El kilometraje maximo debe ser mayor a cero */
-export const REGISTRO_ERROR__KILOMETRAJE_GARANTIA_INVALIDO = 0x1774; // 6004
+export const REGISTRO_ERROR__KILOMETRAJE_GARANTIA_INVALIDO = 0x1776; // 6006
 /** NombreClienteInvalido: El nombre del cliente no puede superar los 50 caracteres */
-export const REGISTRO_ERROR__NOMBRE_CLIENTE_INVALIDO = 0x1775; // 6005
+export const REGISTRO_ERROR__NOMBRE_CLIENTE_INVALIDO = 0x1777; // 6007
 /** CedulaInvalida: La cedula del cliente debe ser mayor a cero */
-export const REGISTRO_ERROR__CEDULA_INVALIDA = 0x1776; // 6006
+export const REGISTRO_ERROR__CEDULA_INVALIDA = 0x1778; // 6008
 /** ClienteYaAsociado: El cliente ya esta asociado a este concesionario */
-export const REGISTRO_ERROR__CLIENTE_YA_ASOCIADO = 0x1777; // 6007
+export const REGISTRO_ERROR__CLIENTE_YA_ASOCIADO = 0x1779; // 6009
 /** AsociacionClienteInvalida: La asociacion entre cliente y concesionario no es valida */
-export const REGISTRO_ERROR__ASOCIACION_CLIENTE_INVALIDA = 0x1778; // 6008
+export const REGISTRO_ERROR__ASOCIACION_CLIENTE_INVALIDA = 0x177a; // 6010
 /** AsociacionClienteInactiva: La asociacion del cliente con este concesionario esta inactiva */
-export const REGISTRO_ERROR__ASOCIACION_CLIENTE_INACTIVA = 0x1779; // 6009
+export const REGISTRO_ERROR__ASOCIACION_CLIENTE_INACTIVA = 0x177b; // 6011
 /** PrecioVentaInvalido: El precio de venta debe ser mayor a cero */
-export const REGISTRO_ERROR__PRECIO_VENTA_INVALIDO = 0x177a; // 6010
+export const REGISTRO_ERROR__PRECIO_VENTA_INVALIDO = 0x177c; // 6012
 /** DescripcionServicioInvalida: La descripcion del servicio no puede superar los 100 caracteres */
-export const REGISTRO_ERROR__DESCRIPCION_SERVICIO_INVALIDA = 0x177b; // 6011
+export const REGISTRO_ERROR__DESCRIPCION_SERVICIO_INVALIDA = 0x177d; // 6013
 /** GarantiaNoActiva: La garantia no se encuentra activa */
-export const REGISTRO_ERROR__GARANTIA_NO_ACTIVA = 0x177c; // 6012
+export const REGISTRO_ERROR__GARANTIA_NO_ACTIVA = 0x177e; // 6014
 /** GarantiaNoIniciada: La garantia aun no ha comenzado */
-export const REGISTRO_ERROR__GARANTIA_NO_INICIADA = 0x177d; // 6013
+export const REGISTRO_ERROR__GARANTIA_NO_INICIADA = 0x177f; // 6015
 /** GarantiaVencida: La garantia ha vencido */
-export const REGISTRO_ERROR__GARANTIA_VENCIDA = 0x177e; // 6014
+export const REGISTRO_ERROR__GARANTIA_VENCIDA = 0x1780; // 6016
 /** KilometrajeGarantiaExcedido: El kilometraje supera el limite de la garantia */
-export const REGISTRO_ERROR__KILOMETRAJE_GARANTIA_EXCEDIDO = 0x177f; // 6015
+export const REGISTRO_ERROR__KILOMETRAJE_GARANTIA_EXCEDIDO = 0x1781; // 6017
 /** DescripcionReclamacionInvalida: La descripcion de la reclamacion no puede superar los 100 caracteres */
-export const REGISTRO_ERROR__DESCRIPCION_RECLAMACION_INVALIDA = 0x1780; // 6016
+export const REGISTRO_ERROR__DESCRIPCION_RECLAMACION_INVALIDA = 0x1782; // 6018
 /** MotoVendida: No se puede eliminar una moto que ya fue vendida */
-export const REGISTRO_ERROR__MOTO_VENDIDA = 0x1781; // 6017
+export const REGISTRO_ERROR__MOTO_VENDIDA = 0x1783; // 6019
 /** MotoConHistorial: No se puede eliminar una moto que tiene historial de servicios o reclamaciones */
-export const REGISTRO_ERROR__MOTO_CON_HISTORIAL = 0x1782; // 6018
+export const REGISTRO_ERROR__MOTO_CON_HISTORIAL = 0x1784; // 6020
 /** PuntosInvalidos: La cantidad de puntos debe ser mayor a cero */
-export const REGISTRO_ERROR__PUNTOS_INVALIDOS = 0x1783; // 6019
+export const REGISTRO_ERROR__PUNTOS_INVALIDOS = 0x1785; // 6021
 /** MintNoTransferible: El mint debe tener activa la extension NonTransferable de Token-2022 */
-export const REGISTRO_ERROR__MINT_NO_TRANSFERIBLE = 0x1784; // 6020
+export const REGISTRO_ERROR__MINT_NO_TRANSFERIBLE = 0x1786; // 6022
 /** Token2022Requerido: Esta operacion requiere el programa Token-2022 */
-export const REGISTRO_ERROR__TOKEN2022_REQUERIDO = 0x1785; // 6021
+export const REGISTRO_ERROR__TOKEN2022_REQUERIDO = 0x1787; // 6023
 /** DecimalesMintInvalidos: El mint de fidelizacion debe tener cero decimales */
-export const REGISTRO_ERROR__DECIMALES_MINT_INVALIDOS = 0x1786; // 6022
+export const REGISTRO_ERROR__DECIMALES_MINT_INVALIDOS = 0x1788; // 6024
 /** AutoridadMintInvalida: La autoridad del mint no coincide con la PDA del programa */
-export const REGISTRO_ERROR__AUTORIDAD_MINT_INVALIDA = 0x1787; // 6023
+export const REGISTRO_ERROR__AUTORIDAD_MINT_INVALIDA = 0x1789; // 6025
 /** MintInvalido: El mint no coincide con el configurado para este concesionario */
-export const REGISTRO_ERROR__MINT_INVALIDO = 0x1788; // 6024
+export const REGISTRO_ERROR__MINT_INVALIDO = 0x178a; // 6026
 /** VentaNoCorresponde: La venta no corresponde al concesionario o al cliente indicados */
-export const REGISTRO_ERROR__VENTA_NO_CORRESPONDE = 0x1789; // 6025
+export const REGISTRO_ERROR__VENTA_NO_CORRESPONDE = 0x178b; // 6027
 /** WalletClienteInvalida: La wallet no esta vinculada al cliente o no coincide con la cuenta de tokens */
-export const REGISTRO_ERROR__WALLET_CLIENTE_INVALIDA = 0x178a; // 6026
+export const REGISTRO_ERROR__WALLET_CLIENTE_INVALIDA = 0x178c; // 6028
 /** ServicioNoEncontrado: El servicio no existe en el catalogo */
-export const REGISTRO_ERROR__SERVICIO_NO_ENCONTRADO = 0x178b; // 6027
+export const REGISTRO_ERROR__SERVICIO_NO_ENCONTRADO = 0x178d; // 6029
 /** ServicioNoDisponible: El servicio no esta disponible para canje */
-export const REGISTRO_ERROR__SERVICIO_NO_DISPONIBLE = 0x178c; // 6028
+export const REGISTRO_ERROR__SERVICIO_NO_DISPONIBLE = 0x178e; // 6030
 /** CatalogoLleno: El catalogo alcanzo el maximo de servicios */
-export const REGISTRO_ERROR__CATALOGO_LLENO = 0x178d; // 6029
+export const REGISTRO_ERROR__CATALOGO_LLENO = 0x178f; // 6031
 /** NombreServicioInvalido: El nombre del servicio debe contener entre 1 y 40 caracteres */
-export const REGISTRO_ERROR__NOMBRE_SERVICIO_INVALIDO = 0x178e; // 6030
+export const REGISTRO_ERROR__NOMBRE_SERVICIO_INVALIDO = 0x1790; // 6032
 /** SaldoInsuficiente: El cliente no tiene suficientes puntos BERA para este servicio */
-export const REGISTRO_ERROR__SALDO_INSUFICIENTE = 0x178f; // 6031
+export const REGISTRO_ERROR__SALDO_INSUFICIENTE = 0x1791; // 6033
 /** IdCanjeInvalido: El identificador del canje debe ser mayor a cero */
-export const REGISTRO_ERROR__ID_CANJE_INVALIDO = 0x1790; // 6032
+export const REGISTRO_ERROR__ID_CANJE_INVALIDO = 0x1792; // 6034
 /** CanjeDuranteGarantia: Este servicio de fidelizacion solo puede canjearse cuando la garantia ya no cubre la motocicleta */
-export const REGISTRO_ERROR__CANJE_DURANTE_GARANTIA = 0x1791; // 6033
+export const REGISTRO_ERROR__CANJE_DURANTE_GARANTIA = 0x1793; // 6035
 /** GarantiaNoCorresponde: La garantia no corresponde a la motocicleta seleccionada */
-export const REGISTRO_ERROR__GARANTIA_NO_CORRESPONDE = 0x1792; // 6034
+export const REGISTRO_ERROR__GARANTIA_NO_CORRESPONDE = 0x1794; // 6036
 /** MotoNoVendida: La motocicleta debe estar registrada como vendida */
-export const REGISTRO_ERROR__MOTO_NO_VENDIDA = 0x1793; // 6035
+export const REGISTRO_ERROR__MOTO_NO_VENDIDA = 0x1795; // 6037
 /** ContadorInvalido: Error: El contador ha alcanzado su valor máximo. */
-export const REGISTRO_ERROR__CONTADOR_INVALIDO = 0x1794; // 6036
+export const REGISTRO_ERROR__CONTADOR_INVALIDO = 0x1796; // 6038
 /** ClienteSinCompras: El cliente debe tener al menos una motocicleta comprada en este concesionario para vincular su wallet */
-export const REGISTRO_ERROR__CLIENTE_SIN_COMPRAS = 0x1795; // 6037
+export const REGISTRO_ERROR__CLIENTE_SIN_COMPRAS = 0x1797; // 6039
 /** MetadataCidInvalido: El CID debe contener entre 1 y 100 caracteres alfanuméricos */
-export const REGISTRO_ERROR__METADATA_CID_INVALIDO = 0x1796; // 6038
+export const REGISTRO_ERROR__METADATA_CID_INVALIDO = 0x1798; // 6040
 /** KilometrajeMotoInvalido: El registro de kilometraje no corresponde a esta moto o concesionario */
-export const REGISTRO_ERROR__KILOMETRAJE_MOTO_INVALIDO = 0x1797; // 6039
+export const REGISTRO_ERROR__KILOMETRAJE_MOTO_INVALIDO = 0x1799; // 6041
 /** KilometrajeDecreciente: El kilometraje no puede ser inferior al último valor registrado */
-export const REGISTRO_ERROR__KILOMETRAJE_DECRECIENTE = 0x1798; // 6040
+export const REGISTRO_ERROR__KILOMETRAJE_DECRECIENTE = 0x179a; // 6042
 
 export type RegistroError =
   | typeof REGISTRO_ERROR__ASOCIACION_CLIENTE_INACTIVA
@@ -107,6 +111,7 @@ export type RegistroError =
   | typeof REGISTRO_ERROR__CEDULA_INVALIDA
   | typeof REGISTRO_ERROR__CLIENTE_SIN_COMPRAS
   | typeof REGISTRO_ERROR__CLIENTE_YA_ASOCIADO
+  | typeof REGISTRO_ERROR__COLECCION_INVALIDA
   | typeof REGISTRO_ERROR__CONTADOR_INVALIDO
   | typeof REGISTRO_ERROR__DECIMALES_MINT_INVALIDOS
   | typeof REGISTRO_ERROR__DESCRIPCION_RECLAMACION_INVALIDA
@@ -122,6 +127,7 @@ export type RegistroError =
   | typeof REGISTRO_ERROR__KILOMETRAJE_GARANTIA_INVALIDO
   | typeof REGISTRO_ERROR__KILOMETRAJE_MOTO_INVALIDO
   | typeof REGISTRO_ERROR__METADATA_CID_INVALIDO
+  | typeof REGISTRO_ERROR__METADATA_URI_INVALIDA
   | typeof REGISTRO_ERROR__MINT_INVALIDO
   | typeof REGISTRO_ERROR__MINT_NO_TRANSFERIBLE
   | typeof REGISTRO_ERROR__MOTO_CON_HISTORIAL
@@ -152,6 +158,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [REGISTRO_ERROR__CEDULA_INVALIDA]: `La cedula del cliente debe ser mayor a cero`,
     [REGISTRO_ERROR__CLIENTE_SIN_COMPRAS]: `El cliente debe tener al menos una motocicleta comprada en este concesionario para vincular su wallet`,
     [REGISTRO_ERROR__CLIENTE_YA_ASOCIADO]: `El cliente ya esta asociado a este concesionario`,
+    [REGISTRO_ERROR__COLECCION_INVALIDA]: `La coleccion de reconocimientos no es valida`,
     [REGISTRO_ERROR__CONTADOR_INVALIDO]: `Error: El contador ha alcanzado su valor máximo.`,
     [REGISTRO_ERROR__DECIMALES_MINT_INVALIDOS]: `El mint de fidelizacion debe tener cero decimales`,
     [REGISTRO_ERROR__DESCRIPCION_RECLAMACION_INVALIDA]: `La descripcion de la reclamacion no puede superar los 100 caracteres`,
@@ -167,6 +174,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [REGISTRO_ERROR__KILOMETRAJE_GARANTIA_INVALIDO]: `El kilometraje maximo debe ser mayor a cero`,
     [REGISTRO_ERROR__KILOMETRAJE_MOTO_INVALIDO]: `El registro de kilometraje no corresponde a esta moto o concesionario`,
     [REGISTRO_ERROR__METADATA_CID_INVALIDO]: `El CID debe contener entre 1 y 100 caracteres alfanuméricos`,
+    [REGISTRO_ERROR__METADATA_URI_INVALIDA]: `La URI de metadata debe ser HTTPS y no superar 200 bytes`,
     [REGISTRO_ERROR__MINT_INVALIDO]: `El mint no coincide con el configurado para este concesionario`,
     [REGISTRO_ERROR__MINT_NO_TRANSFERIBLE]: `El mint debe tener activa la extension NonTransferable de Token-2022`,
     [REGISTRO_ERROR__MOTO_CON_HISTORIAL]: `No se puede eliminar una moto que tiene historial de servicios o reclamaciones`,

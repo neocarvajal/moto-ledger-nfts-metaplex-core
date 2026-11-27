@@ -18,6 +18,7 @@ export * from "./moto";
 export * from "./programaFidelidad";
 export * from "./puntosVenta";
 export * from "./reclamacion";
+export * from "./reconocimientoColeccion";
 export * from "./registroGlobal";
 export * from "./servicio";
 export * from "./venta";

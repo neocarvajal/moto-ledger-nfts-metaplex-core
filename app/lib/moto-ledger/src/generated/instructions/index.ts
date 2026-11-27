@@ -7,6 +7,7 @@
  */
 
 export * from "./actualizarMetadataFidelidad";
+export * from "./actualizarMetadataReconocimientos";
 export * from "./actualizarPuntosFidelidad";
 export * from "./actualizarServicioCatalogo";
 export * from "./agregarServicioCatalogo";
@@ -20,6 +21,7 @@ export * from "./otorgarPuntos";
 export * from "./reclamarGarantia";
 export * from "./registrarAsociacionCliente";
 export * from "./registrarCliente";
+export * from "./registrarColeccionReconocimientos";
 export * from "./registrarConcesionario";
 export * from "./registrarMetadataFidelidad";
 export * from "./registrarMoto";
