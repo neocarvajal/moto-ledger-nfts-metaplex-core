@@ -655,13 +655,21 @@ export function SalesManagement({
           recognitionIssued = true;
         } catch (recognitionError) {
           console.error("La venta quedó registrada, pero el NFT quedó pendiente:", recognitionError);
-          try {
-            const assetInfo = await client.rpc
-              .getAccountInfo(address(awardedRecognition.asset), { encoding: "base64" })
-              .send();
-            recognitionIssued = Boolean(assetInfo.value);
-          } catch (reconciliationError) {
-            console.warn("No se pudo verificar el estado del NFT:", reconciliationError);
+          for (let attempt = 0; attempt < 5; attempt += 1) {
+            if (attempt > 0) {
+              await new Promise((resolve) => setTimeout(resolve, 700));
+            }
+            try {
+              const assetInfo = await client.rpc
+                .getAccountInfo(address(awardedRecognition.asset), { encoding: "base64" })
+                .send();
+              if (assetInfo.value) {
+                recognitionIssued = true;
+                break;
+              }
+            } catch (reconciliationError) {
+              console.warn("No se pudo verificar todavía el estado del NFT:", reconciliationError);
+            }
           }
           if (!recognitionIssued) {
             console.warn("La emisión automática del NFT quedó pendiente:", recognitionError);
