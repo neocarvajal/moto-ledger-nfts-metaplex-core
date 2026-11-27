@@ -138,7 +138,7 @@ const agentes = modelos.map((modelo) => ({
   modelo,
   agente: createReactAgent({
     llm: new ChatGoogle({ model: modelo, apiKey, maxRetries: 1 }),
-    tools: tools as any,
+    tools: tools as Parameters<typeof createReactAgent>[0]["tools"],
     messageModifier: instrucciones,
   }),
 }));
