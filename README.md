@@ -10,7 +10,7 @@
 > **Programa:** `64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj`  
 > **Aplicación:** [moto-ledger-token-2022.vercel.app](https://moto-ledger-token-2022.vercel.app/)
 
-## Reconocimientos NFT con Metaplex Core
+## Objetivo: reconocimientos NFT por hitos
 
 MotoLedger incorpora un módulo **Reconocimientos NFT** independiente de **Fidelización Token-2022**. Los NFT son certificados por compras confirmadas: el cliente recibe un reconocimiento al alcanzar 1, 3 y 5 ventas en un mismo concesionario. No son puntos, no se canjean por servicios y no se queman al realizar un canje.
 
@@ -61,6 +61,7 @@ Las tres imágenes JPG incluidas en el repositorio se cargan por defecto desde `
 El JSON incluye `name`, `symbol`, `description`, `image`, `properties.files` y atributos de plataforma/hito. Los datos de cliente, venta y concesionario no se incorporan a la metadata pública: los atributos específicos de la emisión se guardan en el Asset Metaplex Core.
 
 Para almacenamiento IPFS se utilizan `PINATA_JWT` y `NEXT_PUBLIC_GATEWAY_URL`. La URL generada debe ser HTTPS y apuntar al JSON del gateway público, no a una página HTML de GitHub ni a una URI `ipfs://`.
+
 ### Flujo de emisión
 
 - **Venta con wallet vinculada:** si la colección está configurada y la venta alcanza exactamente el siguiente hito (1, 3 o 5), la aplicación añade la instrucción Metaplex Core a la misma transacción que registra la venta. Si también corresponde emitir puntos Token-2022, las instrucciones de venta, puntos y NFT se envían juntas.
