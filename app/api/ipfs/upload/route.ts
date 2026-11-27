@@ -247,11 +247,13 @@ export async function POST(request: Request) {
     console.info("[Pinata] 5. Subiendo imagen...");
     const imageResult = await pinata.upload.public
       .file(file)
-      .name(`${symbol}-loyalty-image`)
+      .name(`${symbol}-${purpose}-image${milestoneValue ? `-${milestoneValue}` : ""}`)
       .keyvalues({
         dealership,
         cluster,
-        category: "loyalty-image",
+        category: purpose === "token" ? "loyalty-image" : "metaplex-core-recognition-image",
+        purpose,
+        ...(milestoneValue ? { milestone: milestoneValue } : {}),
       });
     console.info("[Pinata] Imagen subida:", imageResult.cid);
 
@@ -261,6 +263,8 @@ export async function POST(request: Request) {
       symbol,
       description,
       image: imageUri,
+      ...(attributes.length ? { attributes } : {}),
+      properties: { files: [{ uri: imageUri, type: file.type }], category: "image" },
     };
     const metadataFile = new File(
       [JSON.stringify(metadata, null, 2)],
@@ -271,11 +275,13 @@ export async function POST(request: Request) {
     console.info("[Pinata] 6. Subiendo metadata JSON...");
     const metadataResult = await pinata.upload.public
       .file(metadataFile)
-      .name(`${symbol}-metadata.json`)
+      .name(`${symbol}-${purpose}-metadata${milestoneValue ? `-${milestoneValue}` : ""}.json`)
       .keyvalues({
         dealership,
         cluster,
-        category: "loyalty-token-metadata",
+        category: purpose === "token" ? "loyalty-token-metadata" : "metaplex-core-recognition-metadata",
+        purpose,
+        ...(milestoneValue ? { milestone: milestoneValue } : {}),
       });
     console.info("[Pinata] Metadata subida:", metadataResult.cid);
 
