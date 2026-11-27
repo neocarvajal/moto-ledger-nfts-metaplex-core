@@ -122,8 +122,8 @@ La versión desplegada permite revisar el dashboard sin instalar el proyecto ni 
 
 1. Abre [MotoLedger en Vercel](https://moto-ledger-token-2022.vercel.app/).
 2. Selecciona **Solana Devnet** y conecta la wallet owner de un concesionario de demostración.
-3. Entra en **Reconocimientos NFT** para consultar la colección y los hitos configurados.
-4. En **Reconocimientos NFT**, crea o registra la colección y sube las metadata de los tres hitos a Pinata para guardar sus URI en Solana.
+3. En **Reconocimientos NFT**, crea o registra la colección Core del concesionario.
+4. Sube las imágenes y metadata de los hitos 1, 3 y 5 a Pinata para guardar sus URI en la PDA de Solana.
 5. Revisa las ventas históricas y utiliza **Emitir todos los disponibles** para procesar los reconocimientos pendientes de clientes con wallet vinculada.
 6. Registra una nueva venta que complete un hito para comprobar la emisión automática. La venta se confirma primero; el NFT se procesa en una transacción independiente.
 7. Consulta los NFT emitidos y abre sus direcciones en Solana Explorer.
