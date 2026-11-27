@@ -6,11 +6,7 @@ import milestone3Image from "@/assets/recognitions/milestone-3.jpg";
 import milestone5Image from "@/assets/recognitions/milestone-5.jpg";
 import type { AppClient } from "../../lib/solana-client";
 import type { ClusterMoniker } from "../../lib/solana-client";
-import {
-  saveRecognitionConfig,
-  type RecognitionConfig,
-  type RecognitionMilestone,
-} from "../../lib/moto-ledger/recognitions";
+import type { RecognitionConfig, RecognitionMilestone } from "../../lib/moto-ledger/recognitions";
 
 const MILESTONES: RecognitionMilestone[] = [1, 3, 5];
 const DEFAULT_IMAGES = { 1: milestone1Image, 3: milestone3Image, 5: milestone5Image };
@@ -33,7 +29,7 @@ export function RecognitionMilestoneUploader({
   dealership: string;
   cluster: ClusterMoniker;
   config: RecognitionConfig;
-  onSaved: (config: RecognitionConfig) => void;
+  onSaved: (config: RecognitionConfig) => Promise<void>;
 }) {
   const [files, setFiles] = useState<Partial<Record<RecognitionMilestone, File>>>({});
   const [busy, setBusy] = useState(false);
@@ -109,8 +105,6 @@ export function RecognitionMilestoneUploader({
       ...baseConfig,
       milestones: { ...(baseConfig.milestones ?? {}), [milestone]: metadata },
     };
-    saveRecognitionConfig(owner, dealership, cluster, next);
-    onSaved(next);
     setFiles((current) => ({ ...current, [milestone]: undefined }));
     return next;
   };
@@ -119,8 +113,9 @@ export function RecognitionMilestoneUploader({
     setBusy(true);
     setStatus("");
     try {
-      await saveMilestone(milestone);
-      setStatus("Metadata del hito " + milestone + " guardada en Pinata.");
+      const next = await saveMilestone(milestone);
+      await onSaved(next);
+      setStatus("Metadata del hito " + milestone + " guardada en Pinata y registrada en Solana.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "No se pudo completar la carga.");
     } finally {
@@ -145,7 +140,8 @@ export function RecognitionMilestoneUploader({
           current = await saveMilestone(milestone, current);
         }
       }
-      setStatus("Las tres metadata de reconocimiento están cargadas.");
+      await onSaved(current);
+      setStatus("Las metadata de reconocimiento quedaron cargadas y registradas en Solana.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "No se pudo completar la carga.");
     } finally {
@@ -180,7 +176,7 @@ export function RecognitionMilestoneUploader({
         })}
       </div>
       {status && <p className="mt-3 text-[10px] text-[#68717b]" role="status">{status}</p>}
-      <p className="mt-3 text-[9px] text-[#9299a1]">Se utilizan por defecto los JPG versionados en assets/recognitions. Puedes sustituir cualquiera desde el selector. La wallet propietaria firma cada carga; las imágenes y JSON se suben a Pinata.</p>
+      <p className="mt-3 text-[9px] text-[#9299a1]">Se utilizan por defecto los JPG versionados en assets/recognitions. Puedes sustituir cualquiera desde el selector. La wallet propietaria autoriza cada carga y firma la actualización de las URI en Solana; las imágenes y JSON se suben a Pinata.</p>
     </section>
   );
 }
