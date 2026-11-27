@@ -95,24 +95,33 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
     });
   }, [session?.status, session?.walletAddress, connected?.account.address, token, loadSession]);
 
+  const signedSession = session?.status === "signed" ? session : null;
+  const signedCliente = signedSession?.cliente;
+  const signedIdCanje = signedSession?.idCanje;
+  const signedWalletAddress = signedSession?.walletAddress;
+  const signedConcesionario = signedSession?.concesionario;
+  const signedMint = signedSession?.mint;
+  const signedServicioId = signedSession?.servicioId;
+  const signedPuntos = signedSession?.puntos;
+
   useEffect(() => {
     let active = true;
     setCompletionVerified(false);
-    if (session?.status !== "signed") return;
+    if (!signedCliente || !signedIdCanje || !signedWalletAddress || !signedConcesionario || !signedMint || signedServicioId === undefined || !signedPuntos) return;
     const verifyReceipt = async () => {
       try {
-        const [receiptPda] = await deriveCanjeServicioPda(address(session.cliente), BigInt(session.idCanje));
+        const [receiptPda] = await deriveCanjeServicioPda(address(signedCliente), BigInt(signedIdCanje));
         const receipt = await client.registro.accounts.canjeServicio.fetch(receiptPda).catch(() => null);
         if (!receipt || !active) return;
         const data = receipt.data;
         if (
-          data.cliente === session.cliente &&
-          data.wallet === session.walletAddress &&
-          data.concesionario === session.concesionario &&
-          data.mint === session.mint &&
-          data.idCanje === BigInt(session.idCanje) &&
-          data.servicioId === session.servicioId &&
-          data.puntos === BigInt(session.puntos)
+          data.cliente === signedCliente &&
+          data.wallet === signedWalletAddress &&
+          data.concesionario === signedConcesionario &&
+          data.mint === signedMint &&
+          data.idCanje === BigInt(signedIdCanje) &&
+          data.servicioId === signedServicioId &&
+          data.puntos === BigInt(signedPuntos)
         ) setCompletionVerified(true);
       } catch {
         // The receipt may not exist until the dealership submits the signed transaction.
@@ -121,7 +130,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
     void verifyReceipt();
     const poll = window.setInterval(() => { void verifyReceipt(); }, 2000);
     return () => { active = false; window.clearInterval(poll); };
-  }, [client, session?.status, session?.cliente, session?.idCanje, session?.walletAddress, session?.concesionario, session?.mint, session?.servicioId, session?.puntos]);
+  }, [client, signedCliente, signedIdCanje, signedWalletAddress, signedConcesionario, signedMint, signedServicioId, signedPuntos]);
 
   const sign = async () => {
     if (!session?.transaction || !connected?.signer || connected.account.address !== session.walletAddress || signing) return;
