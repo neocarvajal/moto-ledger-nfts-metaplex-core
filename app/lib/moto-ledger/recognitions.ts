@@ -1,6 +1,8 @@
 import {
+  AccountRole,
   addSignersToInstruction,
-  createSignerFromKeyPair,
+  address,
+  createKeyPairSignerFromBytes,
   type TransactionSigner,
 } from "@solana/kit";
 import {
@@ -16,10 +18,6 @@ import {
   mplCore,
 } from "@metaplex-foundation/mpl-core";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import {
-  toKitInstruction,
-  toKitKeypair,
-} from "@metaplex-foundation/umi-kit-adapters";
 import type { ClusterMoniker } from "../solana-client";
 
 export const RECOGNITION_MILESTONES = [1, 3, 5] as const;
@@ -116,10 +114,37 @@ function createRecognitionUmi(cluster: ClusterMoniker): Umi {
   return createUmi(RPC_URLS[cluster]).use(mplCore());
 }
 
+type UmiInstruction = {
+  programId: string;
+  keys: Array<{
+    pubkey: string;
+    isSigner: boolean;
+    isWritable: boolean;
+  }>;
+  data: Uint8Array;
+};
+
+function toKitInstruction(instruction: UmiInstruction) {
+  return {
+    programAddress: address(instruction.programId),
+    accounts: instruction.keys.map((account) => ({
+      address: address(account.pubkey),
+      role: account.isSigner
+        ? account.isWritable
+          ? AccountRole.WRITABLE_SIGNER
+          : AccountRole.READONLY_SIGNER
+        : account.isWritable
+          ? AccountRole.WRITABLE
+          : AccountRole.READONLY,
+    })),
+    data: instruction.data,
+  };
+}
+
 async function convertBuilder(
-  builder: { getInstructions: () => Array<Parameters<typeof toKitInstruction>[0]> },
+  builder: { getInstructions: () => UmiInstruction[] },
   ownerSigner: TransactionSigner,
-  assetSigner: ReturnType<typeof createSignerFromKeyPair> extends Promise<infer T> ? T : never
+  assetSigner: TransactionSigner
 ) {
   return builder.getInstructions().map((instruction) =>
     addSignersToInstruction(
@@ -152,9 +177,7 @@ export async function buildRecognitionCollectionInstructions({
     payer: authority,
     updateAuthority: authority.publicKey,
   });
-  const collectionSigner = await createSignerFromKeyPair(
-    await toKitKeypair(collection)
-  );
+  const collectionSigner = await createKeyPairSignerFromBytes(collection.secretKey);
   const instructions = await convertBuilder(
     builder,
     ownerSigner,
@@ -221,7 +244,7 @@ export async function buildRecognitionAssetInstructions({
       },
     ],
   });
-  const assetSigner = await createSignerFromKeyPair(await toKitKeypair(asset));
+  const assetSigner = await createKeyPairSignerFromBytes(asset.secretKey);
   const instructions = await convertBuilder(builder, ownerSigner, assetSigner);
   return { asset: asset.publicKey, instructions };
 }
