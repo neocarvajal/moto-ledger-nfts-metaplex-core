@@ -88,17 +88,18 @@ export function RecognitionMilestoneUploader({
     };
   };
 
-  const saveMilestone = async (milestone: RecognitionMilestone) => {
+  const saveMilestone = async (milestone: RecognitionMilestone, baseConfig: RecognitionConfig = config): Promise<RecognitionConfig> => {
     const file = files[milestone];
     if (!file) throw new Error("Selecciona la imagen del hito " + milestone + ".");
     const metadata = await upload(milestone, file);
     const next: RecognitionConfig = {
-      ...config,
-      milestones: { ...(config.milestones ?? {}), [milestone]: metadata },
+      ...baseConfig,
+      milestones: { ...(baseConfig.milestones ?? {}), [milestone]: metadata },
     };
     saveRecognitionConfig(owner, dealership, cluster, next);
     onSaved(next);
     setFiles((current) => ({ ...current, [milestone]: undefined }));
+    return next;
   };
 
   const uploadOne = async (milestone: RecognitionMilestone) => {
@@ -125,8 +126,9 @@ export function RecognitionMilestoneUploader({
     setBusy(true);
     setStatus("");
     try {
+      let current = config;
       for (const milestone of MILESTONES) {
-        if (files[milestone]) await saveMilestone(milestone);
+        if (files[milestone]) current = await saveMilestone(milestone, current);
       }
       setStatus("Las tres metadata de reconocimiento están cargadas.");
     } catch (error) {
