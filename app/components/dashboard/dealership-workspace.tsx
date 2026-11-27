@@ -32,6 +32,7 @@ import { SalesManagement } from "./sales-management";
 import { ServicesManagement } from "./services-management";
 import { SettingsManagement } from "./settings-management";
 import { LoyaltyManagement } from "./loyalty-management";
+import { RecognitionManagement } from "./recognition-management";
 
 type DealershipRecord = { address: string; data: Concesionario };
 
@@ -472,6 +473,17 @@ export function DealershipWorkspace({
         </div>
       )}
 
+
+      {dealership && activeModule === "recognitions" && (
+        <div className="xl:col-span-2">
+          <RecognitionManagement
+            key={`${dealership.address}:${activeModule}`}
+            concesionario={dealership.address}
+            nombreConcesionario={dealership.data.nombreConcesionario}
+            onNavigate={onNavigate}
+          />
+        </div>
+      )}
 
       {dealership && activeModule === "loyalty" && (
         <div className="xl:col-span-2">
