@@ -515,7 +515,7 @@ export function SalesManagement({
           } catch (metadataError) {
             console.warn("No se pudo consultar la metadata del mint de fidelización:", metadataError);
           }
-          const [tokenAccount] = await deriveToken2022Ata(customerWallet, mint);
+          const [tokenAccount] = await deriveToken2022Ata(address(customerWallet), mint);
 
           // Idempotent creation is safe whether the customer's Token-2022
           // ATA already exists or needs to be created. The dealership pays rent.
@@ -523,7 +523,7 @@ export function SalesManagement({
             await getCreateAssociatedTokenIdempotentInstructionAsync({
               payer: connected.signer,
               mint,
-              owner: customerWallet,
+              owner: address(customerWallet),
               tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
             });
 
