@@ -609,7 +609,7 @@ export function SalesManagement({
       if (result) {
         notifyTransactionSuccess(successMessage, result.context.signature);
       } else {
-        toast.success(`${successMessage} La wallet no devolvió la firma, pero la venta y sus reconocimientos ya existen en Solana.`);
+        toast.success(`${successMessage} La transacción ya quedó confirmada en Solana aunque la wallet no devolvió la firma.`);
       }
       setLastSaleConfirmation({
         points: awardedPoints,
@@ -794,7 +794,7 @@ export function SalesManagement({
                 <p className="mt-2 text-[9px] text-[#6c8b7b]">La emisión también quedó asociada permanentemente al registro de esta venta en Solana.</p>
               </div>
             ) : (
-              <p className="mt-3 rounded-lg bg-white px-3 py-2 text-[10px] text-[#68717b]">La venta quedó registrada, pero no se encontró un comprobante de emisión de puntos para esta operación.</p>
+              <p className="mt-3 rounded-lg bg-white px-3 py-2 text-[10px] text-[#68717b]">La venta quedó registrada sin emisión de puntos Token-2022 para esta operación.</p>
             )}
             {lastSaleConfirmation.recognition && (
               <div className="mt-3 rounded-lg border border-[#d8e5f5] bg-white p-4">
