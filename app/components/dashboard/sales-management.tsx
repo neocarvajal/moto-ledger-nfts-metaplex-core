@@ -455,31 +455,48 @@ export function SalesManagement({
         customerWalletAddress = linkedWallet.data.wallet;
       }
       const recognitionConfig = readRecognitionConfig(owner, dealerAddress, cluster);
-      const nextPurchaseCount = sales.filter((sale) => sale.data.cliente === cliente).length + 1;
-      const milestone = recognitionMilestone(nextPurchaseCount);
-      if (recognitionConfig && customerWalletAddress && milestone) {
-        const alreadyIssued = await recognitionAlreadyIssued(
-          cluster,
-          recognitionConfig.collection,
-          cliente,
-          dealerAddress,
-          milestone
-        );
-        if (!alreadyIssued) {
-          const built = await buildRecognitionAssetInstructions({
+      if (recognitionConfig && customerWalletAddress) {
+        const saleDiscriminator = getBase58Decoder().decode(
+          getVentaDiscriminatorBytes()
+        ) as Base58EncodedBytes;
+        const dealershipFilter = dealerAddress as Base58EncodedBytes;
+        const customerFilter = cliente as Base58EncodedBytes;
+        const priorSales = await client.rpc.getProgramAccounts(
+          REGISTRO_PROGRAM_ADDRESS,
+          {
+            encoding: "base64",
+            filters: [
+              { memcmp: { offset: 0n, bytes: saleDiscriminator, encoding: "base58" } },
+              { memcmp: { offset: 8n, bytes: dealershipFilter, encoding: "base58" } },
+              { memcmp: { offset: 40n, bytes: customerFilter, encoding: "base58" } },
+            ],
+          }
+        ).send();
+        const milestone = recognitionMilestone(priorSales.length + 1);
+        if (milestone) {
+          const alreadyIssued = await recognitionAlreadyIssued(
             cluster,
-            owner,
-            ownerSigner: connected.signer,
-            collection: recognitionConfig.collection,
-            metadataUri: recognitionConfig.metadataUri,
-            customerWallet: customerWalletAddress,
-            customer: cliente,
-            dealership: dealerAddress,
-            sale: venta,
-            milestone,
-          });
-          recognitionInstructions = built.instructions;
-          awardedRecognition = { milestone, asset: built.asset };
+            recognitionConfig.collection,
+            cliente,
+            dealerAddress,
+            milestone
+          );
+          if (!alreadyIssued) {
+            const built = await buildRecognitionAssetInstructions({
+              cluster,
+              owner,
+              ownerSigner: connected.signer,
+              collection: recognitionConfig.collection,
+              metadataUri: recognitionConfig.metadataUri,
+              customerWallet: customerWalletAddress,
+              customer: cliente,
+              dealership: dealerAddress,
+              sale: venta,
+              milestone,
+            });
+            recognitionInstructions = built.instructions;
+            awardedRecognition = { milestone, asset: built.asset };
+          }
         }
       }
 
