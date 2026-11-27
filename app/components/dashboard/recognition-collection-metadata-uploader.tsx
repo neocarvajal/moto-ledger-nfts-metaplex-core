@@ -49,7 +49,7 @@ export function RecognitionCollectionMetadataUploader({
       const dealer = await client.registro.accounts.concesionario.fetch(address(dealership));
       const dealerName = dealer.data.nombreConcesionario;
       const dealerId = dealer.data.idConcesionario;
-      metadataName = dealerName + " | Reconocimientos #" + dealerId;
+      metadataName = (dealerName + " | Reconocimientos #" + dealerId).slice(0, 64);
       metadataSymbol = ("ML" + dealerId).slice(0, 10).toUpperCase();
       metadataDescription = "Colección oficial de reconocimientos digitales del concesionario " + dealerName + ", ID " + dealerId + ", emitida en MotoLedger. Incluye hitos de fidelidad por compras verificadas.";
       image = await defaultCover(dealerName, dealerId);
