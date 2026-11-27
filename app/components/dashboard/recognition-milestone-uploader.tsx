@@ -105,7 +105,6 @@ export function RecognitionMilestoneUploader({
       ...baseConfig,
       milestones: { ...(baseConfig.milestones ?? {}), [milestone]: metadata },
     };
-    setFiles((current) => ({ ...current, [milestone]: undefined }));
     return next;
   };
 
@@ -115,6 +114,7 @@ export function RecognitionMilestoneUploader({
     try {
       const next = await saveMilestone(milestone);
       await onSaved(next);
+      setFiles((current) => ({ ...current, [milestone]: undefined }));
       setStatus("Metadata del hito " + milestone + " guardada en Pinata y registrada en Solana.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "No se pudo completar la carga.");
@@ -141,6 +141,7 @@ export function RecognitionMilestoneUploader({
         }
       }
       await onSaved(current);
+      setFiles({});
       setStatus("Las metadata de reconocimiento quedaron cargadas y registradas en Solana.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "No se pudo completar la carga.");
