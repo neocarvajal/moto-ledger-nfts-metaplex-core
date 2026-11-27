@@ -59,27 +59,37 @@ export function WalletLinkClient({ token }: { token: string }) {
 
   useEffect(() => {
     let active = true;
-    void loadSession()
-      .then((data) => {
-        if (!active) return;
-        if (data.cluster !== cluster) setCluster(data.cluster);
-        setMessage("Conecta la wallet que deseas asociar a tu cuenta de cliente.");
-      })
-      .catch((cause) => setError(cause instanceof Error ? cause.message : "No se pudo cargar la solicitud."))
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => { active = false; };
+    const timer = window.setTimeout(() => {
+      void loadSession()
+        .then((data) => {
+          if (!active) return;
+          if (data.cluster !== cluster) setCluster(data.cluster);
+          setMessage("Conecta la wallet que deseas asociar a tu cuenta de cliente.");
+        })
+        .catch((cause) => {
+          if (active) setError(cause instanceof Error ? cause.message : "No se pudo cargar la solicitud.");
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    }, 0);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, [loadSession, cluster, setCluster]);
 
-  useEffect(() => {
-    if (session?.status === "completed" || session?.status === "cancelled") return;
-    const interval = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(interval);
-  }, [session?.status]);
+  const sessionStatus = session?.status;
+  const sessionExpiresAt = session?.expiresAt;
 
   useEffect(() => {
-    if (!session || session.status === "completed" || session.status === "cancelled") return;
+    if (sessionStatus === "completed" || sessionStatus === "cancelled") return;
+    const interval = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [sessionStatus]);
+
+  useEffect(() => {
+    if (!session || sessionStatus === "completed" || sessionStatus === "cancelled") return;
     let active = true;
     const poll = async () => {
       try {
@@ -96,7 +106,7 @@ export function WalletLinkClient({ token }: { token: string }) {
       active = false;
       window.clearInterval(interval);
     };
-  }, [session?.status, session?.expiresAt, loadSession]);
+  }, [sessionStatus, sessionExpiresAt, loadSession]);
 
   useEffect(() => {
     if (!walletSelectionConfirmed || !connected?.account.address || !session || session.walletAddress || walletSentRef.current) return;
