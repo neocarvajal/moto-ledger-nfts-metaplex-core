@@ -457,51 +457,69 @@ export function SalesManagement({
         const linkedWallet = await client.registro.accounts.walletCliente.fetch(walletCliente);
         customerWalletAddress = linkedWallet.data.wallet;
       }
-      const [recognitionConfigPda] = await deriveReconocimientoColeccionPda(dealerAddress);
-      const recognitionConfigInfo = await client.rpc
-        .getAccountInfo(recognitionConfigPda, { encoding: "base64" })
-        .send();
+      let eligibleRecognitionMilestone: number | null = null;
+      let recognitionPreparationError: string | null = null;
       let recognitionConfig: {
         collection: string;
         metadataUri: string;
         milestones: Partial<Record<1 | 3 | 5, { metadataUri: string }>>;
       } | null = null;
-      if (recognitionConfigInfo.value) {
-        const recognitionAccount = await fetchReconocimientoColeccion(client.rpc, recognitionConfigPda);
-        if (
-          recognitionAccount.data.owner === owner &&
-          recognitionAccount.data.concesionario === dealerAddress
-        ) {
-          recognitionConfig = {
-            collection: recognitionAccount.data.collection,
-            metadataUri: recognitionAccount.data.collectionMetadataUri,
-            milestones: {
-              1: { metadataUri: recognitionAccount.data.hito1MetadataUri },
-              3: { metadataUri: recognitionAccount.data.hito3MetadataUri },
-              5: { metadataUri: recognitionAccount.data.hito5MetadataUri },
-            },
-          };
+      try {
+        const [recognitionConfigPda] = await deriveReconocimientoColeccionPda(dealerAddress);
+        const recognitionConfigInfo = await client.rpc
+          .getAccountInfo(recognitionConfigPda, { encoding: "base64" })
+          .send();
+        if (recognitionConfigInfo.value) {
+          const recognitionAccount = await fetchReconocimientoColeccion(client.rpc, recognitionConfigPda);
+          if (
+            recognitionAccount.data.owner === owner &&
+            recognitionAccount.data.concesionario === dealerAddress
+          ) {
+            recognitionConfig = {
+              collection: recognitionAccount.data.collection,
+              metadataUri: recognitionAccount.data.collectionMetadataUri,
+              milestones: {
+                1: { metadataUri: recognitionAccount.data.hito1MetadataUri },
+                3: { metadataUri: recognitionAccount.data.hito3MetadataUri },
+                5: { metadataUri: recognitionAccount.data.hito5MetadataUri },
+              },
+            };
+          }
         }
+      } catch (configError) {
+        recognitionPreparationError = configError instanceof Error
+          ? configError.message
+          : "No se pudo consultar la configuración de reconocimientos.";
+        console.warn("No se pudo consultar la configuración NFT; la venta continuará:", configError);
       }
-      let eligibleRecognitionMilestone: number | null = null;
-      let recognitionPreparationError: string | null = null;
-      const saleDiscriminator = getBase58Decoder().decode(
-        getVentaDiscriminatorBytes()
-      ) as Base58EncodedBytes;
-      const dealershipFilter = dealerAddress as Base58EncodedBytes;
-      const customerFilter = cliente as Base58EncodedBytes;
-      const priorSales = await client.rpc.getProgramAccounts(
-        REGISTRO_PROGRAM_ADDRESS,
-        {
-          encoding: "base64",
-          filters: [
-            { memcmp: { offset: 0n, bytes: saleDiscriminator, encoding: "base58" } },
-            { memcmp: { offset: 8n, bytes: dealershipFilter, encoding: "base58" } },
-            { memcmp: { offset: 40n, bytes: customerFilter, encoding: "base58" } },
-          ],
-        }
-      ).send();
-      const milestone = recognitionMilestone(priorSales.length + 1);
+
+      // A failure while checking NFT progress must not prevent the sale.
+      let milestone: ReturnType<typeof recognitionMilestone> = null;
+      try {
+        const saleDiscriminator = getBase58Decoder().decode(
+          getVentaDiscriminatorBytes()
+        ) as Base58EncodedBytes;
+        const dealershipFilter = dealerAddress as Base58EncodedBytes;
+        const customerFilter = cliente as Base58EncodedBytes;
+        const priorSales = await client.rpc.getProgramAccounts(
+          REGISTRO_PROGRAM_ADDRESS,
+          {
+            encoding: "base64",
+            filters: [
+              { memcmp: { offset: 0n, bytes: saleDiscriminator, encoding: "base58" } },
+              { memcmp: { offset: 8n, bytes: dealershipFilter, encoding: "base58" } },
+              { memcmp: { offset: 40n, bytes: customerFilter, encoding: "base58" } },
+            ],
+          }
+        ).send();
+        milestone = recognitionMilestone(priorSales.length + 1);
+      } catch (progressError) {
+        recognitionPreparationError ??= progressError instanceof Error
+          ? progressError.message
+          : "No se pudo calcular el progreso del cliente.";
+        console.warn("No se pudo calcular el hito NFT antes de la venta; se podrá revisar después:", progressError);
+      }
+
       if (milestone) {
         eligibleRecognitionMilestone = milestone;
         const metadataUri = recognitionConfig?.milestones?.[milestone]?.metadataUri;
@@ -542,7 +560,7 @@ export function SalesManagement({
       }
 
       try {
-        if (walletInfo.value && loyaltyInfo.value) {
+        if (walletInfo.value && loyaltyInfo.value && customerWalletAddress) {
           const loyaltyProgram = await client.registro.accounts.programaFidelidad.fetch(programaFidelidad);
           const customerWallet = customerWalletAddress!;
           const mint = loyaltyProgram.data.mint;
