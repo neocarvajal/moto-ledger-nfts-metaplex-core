@@ -27,7 +27,20 @@ El contador `Cliente.total_motos_cliente` es global para la identidad del client
 3. Pulsa **Generar y subir metadata**. La wallet owner firma una autorización de carga; el servidor verifica esa firma y que la wallet sea propietaria de la cuenta `Concesionario`, y después sube la imagen y el JSON a Pinata.
 4. Cuando aparezca la URL HTTPS de IPFS, pulsa **Crear colección** y aprueba la transacción. La colección queda bajo la autoridad de la wallet owner.
 
-Se crea una sola colección por concesionario. Su metadata e imagen son independientes de las imágenes de los hitos. La dirección de la colección y sus ajustes se guardan en el navegador, asociados al cluster, wallet owner y concesionario. Si cambias de navegador o limpias el almacenamiento, utiliza **Vincular colección existente**.
+Se crea una sola colección por concesionario. Su metadata e imagen son independientes de las imágenes de los hitos. La dirección de la colección y la configuración de sus URI se registran en Solana en la PDA `ReconocimientoColeccion`, derivada con `reconocimiento_coleccion` + PDA del concesionario. El navegador no es la fuente de verdad y no se utiliza `localStorage` para recuperar esta asociación. Al cambiar de navegador o dispositivo, el frontend consulta la PDA y reconstruye el estado desde la blockchain. La wallet owner debe firmar la creación y el registro on-chain de la colección.
+
+### Persistencia on-chain de la colección
+
+La cuenta Anchor `ReconocimientoColeccion` es la fuente de verdad para cada concesionario:
+
+- **PDA:** semillas `[b"reconocimiento_coleccion", concesionario_pubkey]`.
+- **Campos:** owner, PDA del concesionario, dirección de la colección Core, URI de metadata de la colección, URI de metadata para hitos 1/3/5 y bump.
+- **Registro:** `registrar_coleccion_reconocimientos` crea la PDA una sola vez y asocia la colección existente al concesionario. La colección se crea primero con Metaplex Core desde el frontend; la wallet owner firma después el registro Anchor.
+- **Actualización:** `actualizar_metadata_reconocimientos` modifica las URI de los hitos sin permitir reemplazar la dirección de colección registrada.
+- **Permisos:** ambas instrucciones requieren la wallet owner del concesionario. No se modifica el layout de la cuenta `Concesionario`, por lo que no hace falta migrar las cuentas existentes.
+- **Validación de Core:** Anchor guarda la dirección y comprueba que la cuenta exista; el frontend debe verificar que la dirección corresponde a una colección Metaplex Core antes de registrarla. Anchor no deserializa el estado interno de Core en esta versión.
+
+La creación Core y el registro Anchor no son una única transacción: si falla el registro después de crear la colección, se debe reintentar la instrucción de registro con la misma dirección ya creada. No se debe crear una segunda colección como mecanismo de reintento.
 
 ### Metadata de los hitos
 
@@ -56,7 +69,7 @@ Estas son las imágenes JPG incluidas en el repositorio y utilizadas como muestr
   </tr>
 </table>
 
-Las tres imágenes JPG incluidas en el repositorio se cargan por defecto desde `assets/recognitions/milestone-1.jpg`, `assets/recognitions/milestone-3.jpg` y `assets/recognitions/milestone-5.jpg`. No necesitas seleccionarlas manualmente; el selector permite reemplazar cualquiera por otra imagen JPG. Pulsa **Subir los tres hitos** para cargar las pendientes en una sola operación, o sube cada una por separado. Cada carga crea su propio archivo de imagen y JSON público en Pinata; las URI quedan guardadas por concesionario y red. También puedes reemplazar un hito cargando una nueva imagen individualmente. La wallet owner autoriza cada carga mediante firma de mensaje; `PINATA_JWT` permanece exclusivamente en el servidor.
+Las tres imágenes JPG incluidas en el repositorio se cargan por defecto desde `assets/recognitions/milestone-1.jpg`, `assets/recognitions/milestone-3.jpg` y `assets/recognitions/milestone-5.jpg`. No necesitas seleccionarlas manualmente; el selector permite reemplazar cualquiera por otra imagen JPG. Pulsa **Subir los tres hitos** para cargar las pendientes en una sola operación, o sube cada una por separado. Cada carga crea su propio archivo de imagen y JSON público en Pinata. Las URI de los hitos se escriben en la PDA `ReconocimientoColeccion` mediante `actualizar_metadata_reconocimientos`; reemplazar una imagen actualiza su URI on-chain. La wallet owner debe firmar cada actualización. La wallet owner autoriza cada carga mediante firma de mensaje; `PINATA_JWT` permanece exclusivamente en el servidor.
 
 El JSON incluye `name`, `symbol`, `description`, `image`, `properties.files` y atributos de plataforma/hito. Los datos de cliente, venta y concesionario no se incorporan a la metadata pública: los atributos específicos de la emisión se guardan en el Asset Metaplex Core.
 
@@ -87,17 +100,17 @@ npm run build
 
 | Capa | Datos y responsabilidades |
 | --- | --- |
-| **Registro Anchor** | Mantiene las cuentas `Venta` con las direcciones de concesionario, cliente y moto, fecha y precio. En `registrar_venta` valida el contexto de la venta, la asociación activa del cliente, la moto disponible y registra la venta. No crea ni valida NFT, hitos o duplicados de Core. |
+| **Registro Anchor** | Mantiene las cuentas `Venta` y la PDA `ReconocimientoColeccion`. En `registrar_venta` valida el contexto de la venta, la asociación activa del cliente, la moto disponible y registra la venta. `registrar_coleccion_reconocimientos` registra la colección para el concesionario y `actualizar_metadata_reconocimientos` persiste las URI de los hitos. Anchor valida el owner y la relación con el concesionario, pero no deserializa la cuenta Core ni valida hitos o duplicados de Assets. |
 | **Metaplex Core Collection** | Guarda la colección del concesionario, su nombre, URI de metadata y update authority. Hay una colección por concesionario. |
 | **Metaplex Core Asset** | Cada reconocimiento es un Asset con owner = wallet vinculada del cliente, nombre, URI y plugins. El plugin `Attributes` guarda `hito`, PDA de `cliente`, PDA de `concesionario` y PDA de `venta` que alcanzó ese hito. |
 | **Metadata IPFS** | El JSON público y la imagen viven fuera de la cadena en Pinata/IPFS. Se usa una URI independiente por hito; los atributos relacionales se guardan en el Asset, no en el JSON público. |
-| **Aplicación** | Cuenta las ventas del par concesionario/cliente, comprueba si corresponde 1, 3 o 5, consulta la colección para evitar duplicados, prepara las instrucciones Core y coordina la transacción. |
+| **Aplicación** | Consulta la PDA `ReconocimientoColeccion` para recuperar la dirección de colección y las URI persistidas; cuenta las ventas del par concesionario/cliente, comprueba si corresponde 1, 3 o 5, consulta los Assets Core para evitar duplicados, prepara las instrucciones Core y coordina las transacciones. El almacenamiento local, si se utiliza como caché, nunca sustituye el estado on-chain. |
 
 **Autoridad de congelamiento:** el Asset se crea con `PermanentFreezeDelegate`, `frozen: true` y autoridad `UpdateAuthority`. Esa autoridad corresponde a la wallet owner del concesionario, que también es update authority de la colección. El cliente conserva la propiedad (owner) del Asset, pero no la autoridad de congelamiento. No debe describirse como una validación de hitos hecha por Anchor.
 
 ### Alcance y limitaciones
 
-La integración es frontend y reutiliza el programa Anchor, su IDL y el cliente Codama existentes: **no requiere un nuevo despliegue del programa**. Las instrucciones Metaplex Core/Umi se convierten a instrucciones de Solana Kit y se combinan con la instrucción Codama de venta.
+La integración utiliza Metaplex Core/Umi desde el frontend y ahora requiere una nueva versión del programa Anchor para persistir la asociación y metadata de la colección. Después de compilar y desplegar el programa, regenera el IDL y los clientes Codama; el frontend debe consultar la PDA `ReconocimientoColeccion` en cada carga y enviar las instrucciones `registrar_coleccion_reconocimientos` y `actualizar_metadata_reconocimientos` con la firma del owner. La creación de la colección Core y su registro Anchor son operaciones separadas: si la colección se crea pero falla el registro, el frontend debe permitir reintentar el registro de esa misma dirección, sin crear otra colección.
 
 La atomicidad aplica cuando la app incluye el Asset: la venta, la emisión de puntos Token-2022 (si corresponde) y el NFT se confirman o revierten juntos. Si no se cumple un hito, ya existe ese reconocimiento, falta la colección, falta la metadata del hito o el cliente no tiene wallet vinculada, la app registra la venta sin NFT. El reconocimiento elegible queda pendiente cuando faltaba la wallet o la configuración necesaria y puede emitirse después desde **Pendientes**.
 
