@@ -15,8 +15,16 @@ import { RecognitionMilestoneUploader } from "./recognition-milestone-uploader";
 import { RecognitionCollectionMetadataUploader } from "./recognition-collection-metadata-uploader";
 import { useCluster } from "../cluster-context";
 import {
+  deriveReconocimientoColeccionPda,
   deriveWalletClientePda,
 } from "../../lib/moto-ledger/pdas";
+import {
+  fetchReconocimientoColeccion,
+} from "../../lib/moto-ledger/src/generated/accounts/reconocimientoColeccion";
+import {
+  getActualizarMetadataReconocimientosInstruction,
+  getRegistrarColeccionReconocimientosInstruction,
+} from "../../lib/moto-ledger/src/generated/instructions";
 import {
   getVentaDecoder,
   getVentaDiscriminatorBytes,
@@ -28,10 +36,11 @@ import {
   buildRecognitionCollectionInstructions,
   normalizeRecognitionMetadataUri,
   readIssuedRecognitions,
-  readRecognitionConfig,
-  saveRecognitionConfig,
+  verifyRecognitionCoreCollection,
   type IssuedRecognition,
   type RecognitionConfig,
+  type RecognitionMetadata,
+  type RecognitionMilestone,
 } from "../../lib/moto-ledger/recognitions";
 
 type CustomerProgress = {
@@ -39,7 +48,7 @@ type CustomerProgress = {
   name: string;
   purchases: number;
   wallet: string | null;
-  milestoneSales: Partial<Record<1 | 3 | 5, string>>;
+  milestoneSales: Partial<Record<RecognitionMilestone, string>>;
 };
 
 function shortAddress(value: string) {
@@ -48,6 +57,17 @@ function shortAddress(value: string) {
 
 function explorerAddress(value: string, getExplorerUrl: (path: string) => string) {
   return getExplorerUrl(`address/${value}`);
+}
+
+function metadataFromUri(uri: string, milestone?: RecognitionMilestone): RecognitionMetadata | undefined {
+  if (!uri) return undefined;
+  return {
+    name: milestone ? `Reconocimiento ${milestone}` : "Colección de reconocimientos",
+    symbol: milestone ? `ML-HITO-${milestone}` : "MOTO",
+    description: milestone ? `Hito de compra ${milestone}` : "Colección de reconocimientos MotoLedger",
+    imageUri: "",
+    metadataUri: uri,
+  };
 }
 
 export function RecognitionManagement({
@@ -72,17 +92,83 @@ export function RecognitionManagement({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [lastResult, setLastResult] = useState("");
+  const [collectionPda, setCollectionPda] = useState("");
+
+  const applyOnChainConfig = useCallback((data: {
+    collection: string;
+    collectionMetadataUri: string;
+    hito1MetadataUri: string;
+    hito3MetadataUri: string;
+    hito5MetadataUri: string;
+  }) => {
+    const next: RecognitionConfig = {
+      collection: data.collection,
+      metadataUri: data.collectionMetadataUri,
+      collectionMetadata: metadataFromUri(data.collectionMetadataUri),
+      milestones: {
+        1: metadataFromUri(data.hito1MetadataUri, 1),
+        3: metadataFromUri(data.hito3MetadataUri, 3),
+        5: metadataFromUri(data.hito5MetadataUri, 5),
+      },
+    };
+    setConfig(next);
+    setMetadataUri(data.collectionMetadataUri);
+    setCollectionInput(data.collection);
+  }, []);
+
+  const loadCollectionConfig = useCallback(async () => {
+    if (!concesionario) {
+      setConfig(null);
+      setCollectionPda("");
+      return null;
+    }
+    const [pda] = await deriveReconocimientoColeccionPda(address(concesionario));
+    setCollectionPda(pda);
+    const info = await client.rpc.getAccountInfo(pda, { encoding: "base64" }).send();
+    if (!info.value) {
+      setConfig(null);
+      setMetadataUri("");
+      setCollectionInput("");
+      return null;
+    }
+    const account = await fetchReconocimientoColeccion(client.rpc, pda);
+    if (account.data.concesionario !== concesionario) {
+      throw new Error("La PDA de reconocimientos no corresponde al concesionario seleccionado.");
+    }
+    applyOnChainConfig(account.data);
+    return account.data;
+  }, [applyOnChainConfig, client, concesionario]);
 
   useEffect(() => {
-    const stored = owner
-      ? readRecognitionConfig(owner, concesionario, cluster)
-      : null;
-    setConfig(stored);
-    setMetadataUri(stored?.metadataUri ?? "");
-    setCollectionInput(stored?.collection ?? "");
-    setLastResult("");
     setError("");
-  }, [owner, concesionario, cluster]);
+    setLastResult("");
+    void loadCollectionConfig().catch((loadError) => {
+      console.error("No se pudo consultar la configuración NFT on-chain:", loadError);
+      setError(loadError instanceof Error ? loadError.message : "No se pudo consultar la colección on-chain.");
+    });
+  }, [loadCollectionConfig, owner, cluster]);
+
+  const persistMetadata = useCallback(async (next: RecognitionConfig) => {
+    if (!connected?.signer || !owner || !collectionPda) {
+      throw new Error("Conecta la wallet owner para actualizar la metadata on-chain.");
+    }
+    const collectionMetadataUri = normalizeRecognitionMetadataUri(
+      next.collectionMetadata?.metadataUri ?? next.metadataUri
+    );
+    const ix = getActualizarMetadataReconocimientosInstruction({
+      owner: connected.signer,
+      concesionario: address(concesionario),
+      reconocimientoColeccion: address(collectionPda),
+      collectionMetadataUri,
+      hito1MetadataUri: next.milestones?.[1]?.metadataUri ?? "",
+      hito3MetadataUri: next.milestones?.[3]?.metadataUri ?? "",
+      hito5MetadataUri: next.milestones?.[5]?.metadataUri ?? "",
+    });
+    const result = await client.sendTransaction([ix]);
+    const refreshed = await fetchReconocimientoColeccion(client.rpc, address(collectionPda));
+    applyOnChainConfig(refreshed.data);
+    notifyTransactionSuccess("Metadata de reconocimientos actualizada en Solana.", result.context.signature);
+  }, [applyOnChainConfig, client, collectionPda, connected?.signer, concesionario, owner]);
 
   const loadData = useCallback(async () => {
     if (!owner || !concesionario) {
@@ -93,6 +179,7 @@ export function RecognitionManagement({
     setLoading(true);
     setError("");
     try {
+      const onChainConfig = await loadCollectionConfig();
       const dealerFilter = address(concesionario) as Base58EncodedBytes;
       const saleDiscriminator = getBase58Decoder().decode(
         getVentaDiscriminatorBytes()
@@ -108,10 +195,7 @@ export function RecognitionManagement({
         }
       ).send();
 
-      const salesByCustomer = new Map<
-        string,
-        Array<{ address: string; fechaVenta: bigint }>
-      >();
+      const salesByCustomer = new Map<string, Array<{ address: string; fechaVenta: bigint }>>();
       for (const item of sales) {
         const sale = getVentaDecoder().decode(
           getBase64Encoder().encode(item.account.data[0])
@@ -126,14 +210,9 @@ export function RecognitionManagement({
           customerSales.sort((a, b) =>
             a.fechaVenta < b.fechaVenta ? -1 : a.fechaVenta > b.fechaVenta ? 1 : 0
           );
-          const customer = await client.registro.accounts.cliente.fetch(
-            address(customerAddress)
-          );
+          const customer = await client.registro.accounts.cliente.fetch(address(customerAddress));
           const [walletPda] = await deriveWalletClientePda(address(customerAddress));
-          const walletInfo = await client.rpc.getAccountInfo(
-            walletPda,
-            { encoding: "base64" }
-          ).send();
+          const walletInfo = await client.rpc.getAccountInfo(walletPda, { encoding: "base64" }).send();
           let wallet: string | null = null;
           if (walletInfo.value) {
             const linked = await client.registro.accounts.walletCliente.fetch(walletPda);
@@ -155,42 +234,55 @@ export function RecognitionManagement({
       progress.sort((a, b) => b.purchases - a.purchases || a.name.localeCompare(b.name));
       setCustomers(progress);
 
-      if (config) {
-        const assets = await readIssuedRecognitions(cluster, config.collection);
+      if (onChainConfig) {
+        const assets = await readIssuedRecognitions(cluster, onChainConfig.collection);
         setIssued(assets.filter((item) => item.dealership === concesionario));
       } else {
         setIssued([]);
       }
     } catch (loadError) {
       console.error("No se pudieron cargar los reconocimientos:", loadError);
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "No se pudieron consultar las ventas y los NFT del concesionario."
-      );
+      setError(loadError instanceof Error ? loadError.message : "No se pudieron consultar las ventas y los NFT del concesionario.");
     } finally {
       setLoading(false);
     }
-  }, [client, cluster, config, concesionario, owner]);
+  }, [client, cluster, concesionario, loadCollectionConfig, owner]);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
   const pending = useMemo(() => {
-    const issuedKeys = new Set(
-      issued.map((item) => `${item.customer}:${item.milestone}`)
-    );
+    const issuedKeys = new Set(issued.map((item) => `${item.customer}:${item.milestone}`));
     return customers.flatMap((customer) =>
       RECOGNITION_MILESTONES
-        .filter(
-          (milestone) =>
-            customer.purchases >= milestone &&
-            !issuedKeys.has(`${customer.address}:${milestone}`)
-        )
+        .filter((milestone) => customer.purchases >= milestone && !issuedKeys.has(`${customer.address}:${milestone}`))
         .map((milestone) => ({ customer, milestone }))
     );
   }, [customers, issued]);
+
+  const registerCollection = async (collectionAddress: string, uriValue: string) => {
+    if (!connected?.signer || !owner) throw new Error("Conecta la wallet owner del concesionario.");
+    const collection = address(collectionAddress.trim());
+    const uri = normalizeRecognitionMetadataUri(uriValue);
+    await verifyRecognitionCoreCollection(cluster, collection);
+    const [pda] = await deriveReconocimientoColeccionPda(address(concesionario));
+    const current = await client.rpc.getAccountInfo(pda, { encoding: "base64" }).send();
+    if (current.value) throw new Error("Este concesionario ya tiene una colección registrada on-chain. Actualiza su metadata en lugar de registrar otra.");
+    const ix = getRegistrarColeccionReconocimientosInstruction({
+      owner: connected.signer,
+      concesionario: address(concesionario),
+      collection,
+      reconocimientoColeccion: pda,
+      collectionMetadataUri: uri,
+    });
+    const result = await client.sendTransaction([ix]);
+    const account = await fetchReconocimientoColeccion(client.rpc, pda);
+    applyOnChainConfig(account.data);
+    setLastResult("Colección Core registrada en Solana para este concesionario.");
+    notifyTransactionSuccess("Colección de reconocimientos registrada on-chain.", result.context.signature);
+    await loadData();
+  };
 
   const createCollection = async () => {
     if (!connected?.signer || !owner) {
@@ -210,55 +302,46 @@ export function RecognitionManagement({
         metadataUri: uri,
       });
       const result = await client.sendTransaction(built.instructions);
-      const next = { collection: built.collection, metadataUri: uri };
-      saveRecognitionConfig(owner, concesionario, cluster, next);
-      setConfig(next);
       setCollectionInput(built.collection);
-      setMetadataUri(uri);
-      setLastResult("Colección de reconocimientos creada correctamente.");
-      notifyTransactionSuccess(
-        "Colección Metaplex Core creada.",
-        result.context.signature
-      );
+      setLastResult("Colección Core creada. Registrando su dirección en Solana…");
+      notifyTransactionSuccess("Colección Metaplex Core creada.", result.context.signature);
+      try {
+        await registerCollection(built.collection, uri);
+      } catch (registrationError) {
+        setError(
+          (registrationError instanceof Error ? registrationError.message : "No se pudo registrar la colección en Anchor.") +
+          " La colección Core ya fue creada; conserva esta dirección y reintenta el registro, sin crear otra colección."
+        );
+      }
     } catch (createError) {
       console.error("No se pudo crear la colección de reconocimientos:", createError);
-      setError(
-        createError instanceof Error
-          ? createError.message
-          : "No se pudo crear la colección Metaplex Core."
-      );
+      setError(createError instanceof Error ? createError.message : "No se pudo crear la colección Metaplex Core.");
     } finally {
       setBusy(null);
     }
   };
 
-  const restoreCollection = () => {
-    if (!owner) return;
+  const recoverRegistration = async () => {
+    setBusy("register");
+    setError("");
     try {
-      const uri = normalizeRecognitionMetadataUri(metadataUri);
-      const collection = address(collectionInput.trim());
-      const next = { collection, metadataUri: uri };
-      saveRecognitionConfig(owner, concesionario, cluster, next);
-      setConfig(next);
-      setLastResult("Colección existente vinculada a este concesionario en este navegador.");
-      setError("");
-    } catch (restoreError) {
-      setError(
-        restoreError instanceof Error
-          ? restoreError.message
-          : "Revisa la dirección de la colección y la URL de metadata."
-      );
+      await registerCollection(collectionInput, metadataUri);
+    } catch (registrationError) {
+      setError(registrationError instanceof Error ? registrationError.message : "No se pudo registrar la colección existente.");
+    } finally {
+      setBusy(null);
     }
   };
 
-  const issue = async (customer: CustomerProgress, milestone: number) => {
+  const issue = async (customer: CustomerProgress, milestone: RecognitionMilestone) => {
     if (!connected?.signer || !owner || !config) return;
-    if (!config.milestones?.[milestone as 1 | 3 | 5]?.metadataUri) {
-      toast.error("Primero configura la imagen y metadata de este hito.");
+    const metadataUriForMilestone = config.milestones?.[milestone]?.metadataUri;
+    if (!metadataUriForMilestone) {
+      toast.error("Primero configura la metadata on-chain de este hito.");
       return;
     }
     if (!customer.wallet) {
-      toast.error("El cliente debe vincular su wallet desde el módulo Clientes.");
+      toast.error("El cliente debe tener una wallet destinataria asociada.");
       return;
     }
     const key = `${customer.address}:${milestone}`;
@@ -271,40 +354,44 @@ export function RecognitionManagement({
         owner,
         ownerSigner: connected.signer,
         collection: config.collection,
-        metadataUri: config.milestones?.[milestone as 1 | 3 | 5]?.metadataUri ?? "",
+        metadataUri: metadataUriForMilestone,
         customerWallet: customer.wallet,
         customer: customer.address,
         dealership: concesionario,
-        sale: customer.milestoneSales[milestone as 1 | 3 | 5] ?? "",
-        milestone: milestone as 1 | 3 | 5,
+        sale: customer.milestoneSales[milestone] ?? "",
+        milestone,
       });
       const before = await client.rpc.getBalance(address(owner)).send();
       const result = await client.sendTransaction(built.instructions);
       const after = await client.rpc.getBalance(address(owner)).send();
       const cost = Number(before.value - after.value) / 1_000_000_000;
-      setLastResult(
-        `Reconocimiento de ${milestone} ${milestone === 1 ? "compra" : "compras"} emitido para ${customer.name}. Costo aproximado: ${cost.toFixed(6)} SOL.`
-      );
-      notifyTransactionSuccess(
-        `Reconocimiento NFT de ${milestone} ${milestone === 1 ? "compra" : "compras"} emitido.`,
-        result.context.signature
-      );
+      setLastResult(`Reconocimiento de ${milestone} ${milestone === 1 ? "compra" : "compras"} emitido para ${customer.name}. Costo aproximado: ${cost.toFixed(6)} SOL.`);
+      notifyTransactionSuccess(`Reconocimiento NFT de ${milestone} ${milestone === 1 ? "compra" : "compras"} emitido.`, result.context.signature);
       await loadData();
     } catch (issueError) {
       console.error("No se pudo emitir el reconocimiento:", issueError);
-      setError(
-        issueError instanceof Error
-          ? issueError.message
-          : "No se pudo emitir el reconocimiento NFT."
-      );
+      setError(issueError instanceof Error ? issueError.message : "No se pudo emitir el reconocimiento NFT.");
     } finally {
       setBusy(null);
     }
   };
 
   const customerName = (customerAddress: string) =>
-    customers.find((item) => item.address === customerAddress)?.name ??
-    shortAddress(customerAddress);
+    customers.find((item) => item.address === customerAddress)?.name ?? shortAddress(customerAddress);
+
+  const onMilestonesSaved = async (next: RecognitionConfig) => {
+    setBusy("metadata");
+    setError("");
+    try {
+      await persistMetadata(next);
+      setLastResult("Las URI de los hitos quedaron guardadas en la PDA de Solana.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "No se pudo guardar la metadata on-chain.");
+      throw saveError;
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -331,32 +418,26 @@ export function RecognitionManagement({
                   <p className="mt-3 break-all font-mono text-[9px] text-[#68717b]">{config.collection}</p>
                   <a href={explorerAddress(config.collection, getExplorerUrl)} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[9px] font-semibold text-[#e60012] underline decoration-dotted underline-offset-2">Ver colección en Explorer ↗</a>
                   <label className="mt-4 block">
-                    <span className="mb-1 block text-[9px] font-semibold text-[#68717b]">Metadata JSON público</span>
+                    <span className="mb-1 block text-[9px] font-semibold text-[#68717b]">Metadata JSON de la colección</span>
                     <input value={metadataUri} onChange={(event) => setMetadataUri(event.target.value)} spellCheck={false} className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2 text-[10px] outline-none focus:border-[#e60012]" />
                   </label>
-                  <button type="button" onClick={() => { try { const next = { ...config, metadataUri: normalizeRecognitionMetadataUri(metadataUri) }; saveRecognitionConfig(owner, concesionario, cluster, next); setConfig(next); setMetadataUri(next.metadataUri); setError(""); } catch (saveError) { setError(saveError instanceof Error ? saveError.message : "URL inválida."); } }} className="mt-3 rounded-lg border border-[#e2e5e8] px-3 py-2 text-[9px] font-semibold text-[#555e68] hover:border-[#e60012]">Guardar URL de metadata</button>
+                  <button type="button" onClick={() => void onMilestonesSaved({ ...config, metadataUri, collectionMetadata: metadataFromUri(metadataUri) })} disabled={busy !== null || !metadataUri.trim()} className="mt-3 rounded-lg border border-[#e2e5e8] px-3 py-2 text-[9px] font-semibold text-[#555e68] hover:border-[#e60012] disabled:opacity-50">Guardar metadata on-chain</button>
                 </>
               ) : (
                 <>
-                  <RecognitionCollectionMetadataUploader
-                    client={client}
-                    owner={owner}
-                    dealership={concesionario}
-                    dealershipName={nombreConcesionario}
-                    cluster={cluster}
-                    onUploaded={setMetadataUri}
-                  />
+                  <RecognitionCollectionMetadataUploader client={client} owner={owner} dealership={concesionario} dealershipName={nombreConcesionario} cluster={cluster} onUploaded={setMetadataUri} />
                   <label className="mt-3 block">
                     <span className="mb-1 block text-[9px] font-semibold text-[#68717b]">URL HTTPS del JSON de metadata (Pinata/IPFS)</span>
-                    <input value={metadataUri} onChange={(event) => setMetadataUri(event.target.value)} required placeholder="https://gateway.mypinata.cloud/ipfs/..." spellCheck={false} className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2 text-[10px] outline-none focus:border-[#e60012]" />
+                    <input value={metadataUri} onChange={(event) => setMetadataUri(event.target.value)} required placeholder="https://gateway.mypinata.cloud/ipfs/…" spellCheck={false} className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2 text-[10px] outline-none focus:border-[#e60012]" />
                   </label>
                   <button type="button" onClick={() => void createCollection()} disabled={busy !== null || !metadataUri.trim()} className="mt-3 rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-bold text-white hover:bg-[#c90010] disabled:opacity-50">
-                    {busy === "collection" ? "Creando colección…" : "Crear colección"}
+                    {busy === "collection" ? "Creando colección…" : "Crear colección Core"}
                   </button>
                   <div className="mt-4 border-t border-[#eff0f2] pt-3">
-                    <p className="text-[9px] font-semibold text-[#68717b]">¿Ya existe una colección para este concesionario?</p>
-                    <input value={collectionInput} onChange={(event) => setCollectionInput(event.target.value)} placeholder="Dirección de la colección" spellCheck={false} className="mt-2 w-full rounded-lg border border-[#e2e5e8] px-3 py-2 font-mono text-[9px] outline-none focus:border-[#e60012]" />
-                    <button type="button" onClick={restoreCollection} disabled={!collectionInput.trim() || !metadataUri.trim()} className="mt-2 rounded-lg border border-[#e2e5e8] px-3 py-2 text-[9px] font-semibold text-[#555e68] hover:border-[#e60012]">Vincular colección existente</button>
+                    <p className="text-[9px] font-semibold text-[#68717b]">Recuperación / migración de una colección Core ya creada</p>
+                    <p className="mt-1 text-[9px] text-[#9299a1]">Utiliza esta opción solo si la colección ya existe en Core y falta registrar su dirección en la PDA de este concesionario. No crea una colección nueva.</p>
+                    <input value={collectionInput} onChange={(event) => setCollectionInput(event.target.value)} placeholder="Dirección de la colección Core existente" spellCheck={false} className="mt-2 w-full rounded-lg border border-[#e2e5e8] px-3 py-2 font-mono text-[9px] outline-none focus:border-[#e60012]" />
+                    <button type="button" onClick={() => void recoverRegistration()} disabled={busy !== null || !collectionInput.trim() || !metadataUri.trim()} className="mt-2 rounded-lg border border-[#e2e5e8] px-3 py-2 text-[9px] font-semibold text-[#555e68] hover:border-[#e60012] disabled:opacity-50">{busy === "register" ? "Registrando…" : "Registrar colección existente en Solana"}</button>
                   </div>
                 </>
               )}
@@ -379,27 +460,21 @@ export function RecognitionManagement({
         )}
       </section>
 
-      {busy && busy !== "collection" && <p className="rounded-lg bg-[#fff9ef] px-4 py-3 text-[10px] text-[#9a6a20]">Preparando y enviando reconocimiento… revisa tu wallet.</p>}
+      {busy && busy !== "collection" && <p className="rounded-lg bg-[#fff9ef] px-4 py-3 text-[10px] text-[#9a6a20]">Procesando reconocimiento… revisa tu wallet.</p>}
       {lastResult && <p className="rounded-lg border border-[#ccebdc] bg-[#f0faf5] px-4 py-3 text-[10px] text-[#176b4b]" role="status">{lastResult}</p>}
       {error && <p className="rounded-lg border border-[#f2d1d1] bg-[#fff5f5] px-4 py-3 text-[10px] text-[#c43d3d]" role="alert">{error}</p>}
 
       {config && owner && (
-        <RecognitionMilestoneUploader
-          client={client}
-          owner={owner}
-          dealership={concesionario}
-          cluster={cluster}
-          config={config}
-          onSaved={setConfig}
-        />
+        <RecognitionMilestoneUploader client={client} owner={owner} dealership={concesionario} cluster={cluster} config={config} onSaved={onMilestonesSaved} />
       )}
+
       <section className="overflow-hidden rounded-xl border border-[#e9ebee] bg-white shadow-[0_2px_8px_rgba(24,32,40,0.025)]">
         <div className="border-b border-[#eff0f2] px-6 py-4">
           <p className="text-[9px] font-bold tracking-[0.16em] text-[#e60012]">PENDIENTES</p>
           <h3 className="mt-1 text-[14px] font-bold text-[#252a30]">Clientes que ya alcanzaron un hito</h3>
         </div>
         {!config ? (
-          <p className="p-5 text-[10px] text-[#858d96]">Crea o vincula la colección para consultar y emitir reconocimientos pendientes.</p>
+          <p className="p-5 text-[10px] text-[#858d96]">Registra la colección en Solana para consultar y emitir reconocimientos pendientes.</p>
         ) : pending.length === 0 ? (
           <p className="p-5 text-[10px] text-[#858d96]">No hay reconocimientos pendientes. Los próximos hitos se detectarán al registrar ventas.</p>
         ) : (
@@ -410,17 +485,17 @@ export function RecognitionManagement({
                   <p className="text-[11px] font-semibold text-[#252a30]">{customer.name} · {milestone} {milestone === 1 ? "compra" : "compras"}</p>
                   <p className="mt-1 text-[9px] text-[#858d96]">{customer.purchases} ventas en este concesionario</p>
                   {customer.wallet ? (
-                    <a href={explorerAddress(customer.wallet, getExplorerUrl)} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block font-mono text-[9px] text-[#16845a] underline decoration-dotted underline-offset-2">{shortAddress(customer.wallet)} · wallet vinculada ↗</a>
+                    <a href={explorerAddress(customer.wallet, getExplorerUrl)} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block font-mono text-[9px] text-[#16845a] underline decoration-dotted underline-offset-2">{shortAddress(customer.wallet)} · wallet destinataria ↗</a>
                   ) : (
-                    <p className="mt-1 text-[9px] font-semibold text-[#b7791f]">Wallet no vinculada</p>
+                    <p className="mt-1 text-[9px] font-semibold text-[#b7791f]">Cliente sin wallet destinataria asociada</p>
                   )}
                 </div>
                 {customer.wallet ? (
-                  <button type="button" onClick={() => void issue(customer, milestone)} disabled={busy !== null} className="rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-bold text-white hover:bg-[#c90010] disabled:opacity-50">
+                  <button type="button" onClick={() => void issue(customer, milestone)} disabled={busy !== null || !config.milestones?.[milestone]?.metadataUri} className="rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-bold text-white hover:bg-[#c90010] disabled:opacity-50">
                     {busy === `${customer.address}:${milestone}` ? "Emitiendo…" : "Emitir reconocimiento"}
                   </button>
                 ) : (
-                  <button type="button" onClick={() => onNavigate("customers")} className="rounded-lg border border-[#e2e5e8] px-4 py-2.5 text-[10px] font-semibold text-[#555e68] hover:border-[#e60012]">Ir a Clientes y vincular wallet</button>
+                  <button type="button" onClick={() => onNavigate("customers")} className="rounded-lg border border-[#e2e5e8] px-4 py-2.5 text-[10px] font-semibold text-[#555e68] hover:border-[#e60012]">Ir a Clientes</button>
                 )}
               </div>
             ))}
