@@ -355,6 +355,7 @@ export function RecognitionManagement({
     setBusy(key);
     setError("");
     setLastResult("");
+    let assetAddress: string | null = null;
     try {
       const alreadyIssued = await recognitionAlreadyIssued(
         cluster,
@@ -380,6 +381,7 @@ export function RecognitionManagement({
         sale: customer.milestoneSales[milestone] ?? "",
         milestone,
       });
+      assetAddress = built.asset;
       const before = await client.rpc.getBalance(address(owner)).send();
       const result = await client.sendTransaction(built.instructions);
       const after = await client.rpc.getBalance(address(owner)).send();
@@ -389,7 +391,27 @@ export function RecognitionManagement({
       await loadData();
     } catch (issueError) {
       console.error("No se pudo emitir el reconocimiento:", issueError);
-      setError(issueError instanceof Error ? issueError.message : "No se pudo emitir el reconocimiento NFT.");
+      let confirmed = false;
+      if (assetAddress) {
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 700));
+          try {
+            const info = await client.rpc.getAccountInfo(address(assetAddress), { encoding: "base64" }).send();
+            if (info.value) {
+              confirmed = true;
+              break;
+            }
+          } catch (reconciliationError) {
+            console.warn("No se pudo reconciliar todavía el Asset:", reconciliationError);
+          }
+        }
+      }
+      if (confirmed) {
+        setLastResult(`El reconocimiento de ${milestone} ${milestone === 1 ? "compra" : "compras"} quedó confirmado en Solana.`);
+        await loadData();
+      } else {
+        setError(issueError instanceof Error ? issueError.message : "No se pudo emitir el reconocimiento NFT.");
+      }
     } finally {
       setBusy(null);
     }
@@ -409,6 +431,7 @@ export function RecognitionManagement({
     const failures: string[] = [];
     try {
       for (const { customer, milestone } of readyPending) {
+        let assetAddress: string | null = null;
         try {
           const exists = await recognitionAlreadyIssued(
             cluster,
@@ -435,10 +458,30 @@ export function RecognitionManagement({
             sale: customer.milestoneSales[milestone] ?? "",
             milestone,
           });
+          assetAddress = built.asset;
           await client.sendTransaction(built.instructions);
           emitted += 1;
         } catch (issueError) {
-          failures.push(`${customer.name} · hito ${milestone}: ${issueError instanceof Error ? issueError.message : "error de emisión"}`);
+          let confirmed = false;
+          if (assetAddress) {
+            for (let attempt = 0; attempt < 5; attempt += 1) {
+              if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 700));
+              try {
+                const info = await client.rpc.getAccountInfo(address(assetAddress), { encoding: "base64" }).send();
+                if (info.value) {
+                  confirmed = true;
+                  break;
+                }
+              } catch (reconciliationError) {
+                console.warn("No se pudo reconciliar todavía el Asset del lote:", reconciliationError);
+              }
+            }
+          }
+          if (confirmed) {
+            emitted += 1;
+          } else {
+            failures.push(`${customer.name} · hito ${milestone}: ${issueError instanceof Error ? issueError.message : "error de emisión"}`);
+          }
         }
       }
       await loadData();
