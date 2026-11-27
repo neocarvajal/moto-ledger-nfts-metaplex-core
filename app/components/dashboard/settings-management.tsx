@@ -38,7 +38,7 @@ export function SettingsManagement({
       if (!Number.isInteger(days) || days < 1 || days > 65_535) {
         throw new Error("La duración debe ser un número entero entre 1 y 65.535 días.");
       }
-      if (!/^\d+$/.test(maxMileage.trim())) {
+      if (!/^\d+$/.test(mileageValue.trim())) {
         throw new Error("El kilometraje máximo debe ser un entero positivo.");
       }
       mileage = BigInt(mileageValue);
