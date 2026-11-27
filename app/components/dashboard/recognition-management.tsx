@@ -271,7 +271,7 @@ export function RecognitionManagement({
         owner,
         ownerSigner: connected.signer,
         collection: config.collection,
-        metadataUri: config.milestones[milestone as 1 | 3 | 5]!.metadataUri,
+        metadataUri: config.milestones?.[milestone as 1 | 3 | 5]?.metadataUri ?? "",
         customerWallet: customer.wallet,
         customer: customer.address,
         dealership: concesionario,
