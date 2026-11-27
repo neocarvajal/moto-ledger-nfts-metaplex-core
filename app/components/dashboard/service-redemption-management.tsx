@@ -69,6 +69,8 @@ function parseMileage(value: string) {
 export function ServiceRedemptionManagement({ concesionario, nombreConcesionario }: { concesionario: string; nombreConcesionario: string }) {
   const client = useAppClient();
   const connected = useConnectedWallet(client);
+  const connectedAccountAddress = connected?.account.address;
+  const connectedSigner = connected?.signer;
   const { cluster } = useCluster();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
@@ -95,7 +97,9 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
   const preparingRef = useRef(false);
 
   const selectedCustomerRecord = customers.find((item) => item.address === selectedCustomer) ?? null;
-  const selectedSaleRecord = sales.find((item) => item.address === selectedSale) ?? null;
+  const selectedSaleRecord = sales.find(
+    (item) => item.address === selectedSale && item.data.cliente === selectedCustomer
+  ) ?? null;
   const selectedServiceRecord = services.find((item) => String(item.id) === selectedService) ?? null;
 
   useEffect(() => {
@@ -111,7 +115,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
   }, [showQrModal, showCancelConfirm]);
 
   const loadChainData = useCallback(async () => {
-    if (!connected?.account.address) {
+    if (!connectedAccountAddress) {
       setCustomers([]);
       setSales([]);
       setRedemptions([]);
@@ -124,7 +128,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     setCatalogReady(false);
     try {
       const dealer = await client.registro.accounts.concesionario.fetch(address(concesionario));
-      if (dealer.data.owner !== connected.account.address) throw new Error("La wallet conectada no es propietaria del concesionario seleccionado.");
+      if (dealer.data.owner !== connectedAccountAddress) throw new Error("La wallet conectada no es propietaria del concesionario seleccionado.");
 
       const [programPda] = await deriveProgramaFidelidadPda(address(concesionario));
       const [catalogPda] = await deriveCatalogoServiciosPda(address(concesionario));
@@ -154,7 +158,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       const customerDiscriminator = getBase58Decoder().decode(getClienteDiscriminatorBytes()) as Base58EncodedBytes;
       const saleDiscriminator = getBase58Decoder().decode(getVentaDiscriminatorBytes()) as Base58EncodedBytes;
       const redemptionDiscriminator = getBase58Decoder().decode(getCanjeServicioDiscriminatorBytes()) as Base58EncodedBytes;
-      const ownerFilter = address(connected.account.address) as Base58EncodedBytes;
+      const ownerFilter = address(connectedAccountAddress) as Base58EncodedBytes;
       const dealerFilter = address(concesionario) as Base58EncodedBytes;
       const [customerAccounts, saleAccounts, redemptionAccounts] = await Promise.all([
         client.rpc.getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
@@ -206,9 +210,14 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     } finally {
       setLoading(false);
     }
-  }, [client, concesionario, connected?.account.address]);
+  }, [client, concesionario, connectedAccountAddress]);
 
-  useEffect(() => { void loadChainData(); }, [loadChainData]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadChainData();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadChainData]);
 
   const customerRedemptions = useMemo(
     () => redemptions.filter((item) => item.data.cliente === selectedCustomer),
@@ -220,15 +229,13 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     [sales, selectedCustomer]
   );
 
-  useEffect(() => {
-    setSelectedSale((current) => customerSales.some((sale) => sale.address === current) ? current : "");
-  }, [customerSales]);
-
   const [saleDetails, setSaleDetails] = useState<SelectedSale | null>(null);
+  const activeSaleDetails = saleDetails?.address === selectedSaleRecord?.address
+    ? saleDetails
+    : null;
+
   useEffect(() => {
     let active = true;
-    setSaleDetails(null);
-    setMileage("");
     if (!selectedSaleRecord) return;
     void (async () => {
       try {
@@ -289,10 +296,15 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     }
   }, [client, selectedCustomer, mint]);
 
-  useEffect(() => { void loadCustomerBalance(); }, [loadCustomerBalance]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadCustomerBalance();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadCustomerBalance]);
 
   const prepareRedemptionTransaction = useCallback(async (token: string, idCanjeValue: string) => {
-    if (!connected?.signer || !connected.account.address || !selectedCustomerRecord ||
+    if (!connectedSigner || !connectedAccountAddress || !selectedCustomerRecord ||
         !selectedSaleRecord || !selectedServiceRecord || !wallet || !mint) {
       throw new Error("No están disponibles los datos necesarios para preparar el canje.");
     }
@@ -308,7 +320,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     if (existing.value) throw new Error("El identificador de canje ya existe. Cancela la solicitud y genera un nuevo QR.");
     const moto = await client.registro.accounts.moto.fetch(address(selectedSaleRecord.data.moto));
     const instruction = client.registro.instructions.canjearServicio({
-      owner: connected.signer,
+      owner: connectedSigner,
       wallet: createNoopSigner(address(wallet)),
       concesionario: address(concesionario),
       programaFidelidad,
@@ -331,13 +343,13 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     const latestBlockhash = await client.rpc.getLatestBlockhash({ commitment: "confirmed" }).send();
     const message = pipe(
       createTransactionMessage({ version: 0 }),
-      (tx) => setTransactionMessageFeePayerSigner(connected.signer!, tx),
+      (tx) => setTransactionMessageFeePayerSigner(connectedSigner!, tx),
       (tx) => appendTransactionMessageInstruction(instruction, tx),
       (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash.value, tx),
     );
     const partiallySigned = await partiallySignTransactionMessageWithSigners(message);
     assertIsTransactionWithBlockhashLifetime(partiallySigned);
-    const ownerSignature = partiallySigned.signatures[address(connected.account.address)];
+    const ownerSignature = partiallySigned.signatures[address(connectedAccountAddress)];
     if (!ownerSignature || ownerSignature.every((byte) => byte === 0)) {
       throw new Error("La wallet del concesionario no pudo firmar parcialmente la transacción.");
     }
@@ -351,7 +363,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     const payload = await response.json() as { error?: string };
     if (!response.ok) throw new Error(payload.error ?? "No se pudo entregar la transacción al cliente.");
     setSession((current) => current?.token === token ? { ...current, status: "waiting_customer_signature" } : current);
-  }, [client, connected?.signer, connected?.account.address, selectedCustomerRecord, selectedSaleRecord,
+  }, [client, connectedSigner, connectedAccountAddress, selectedCustomerRecord, selectedSaleRecord,
     selectedServiceRecord, wallet, mint, mileage, concesionario, selectedCustomer]);
 
   useEffect(() => {
@@ -425,21 +437,21 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
 
   const startRedemption = async () => {
     if (cluster === "localnet") { toast.error("El canje por QR requiere una red pública accesible desde el teléfono."); return; }
-    if (!connected?.signer || !connected.account.address) { toast.error("Conecta la wallet propietaria del concesionario."); return; }
-    if (!catalogReady || !selectedCustomerRecord || !selectedSaleRecord || !saleDetails || !selectedServiceRecord || !wallet || balance === null || !mint) {
+    if (!connectedSigner || !connectedAccountAddress) { toast.error("Conecta la wallet propietaria del concesionario."); return; }
+    if (!catalogReady || !selectedCustomerRecord || !selectedSaleRecord || !activeSaleDetails || !selectedServiceRecord || !wallet || balance === null || !mint) {
       toast.error("Selecciona un cliente con venta, moto, servicio y wallet vinculada."); return;
     }
     if (selectedServiceRecord.puntos > balance) { toast.error("El cliente no tiene puntos suficientes."); return; }
     let km: bigint;
     try {
       km = parseMileage(mileage);
-      if (km < saleDetails.kilometrajeActual) {
-        throw new Error(`El kilometraje no puede ser inferior al último registrado (${saleDetails.kilometrajeActual.toLocaleString("es-VE")} km).`);
+      if (km < activeSaleDetails.kilometrajeActual) {
+        throw new Error(`El kilometraje no puede ser inferior al último registrado (${activeSaleDetails.kilometrajeActual.toLocaleString("es-VE")} km).`);
       }
     } catch (error) { toast.error(error instanceof Error ? error.message : "Kilometraje inválido."); return; }
     const nowSeconds = BigInt(Math.floor(Date.now() / 1000));
-    const warrantyCovered = saleDetails.garantia.estado === EstadoGarantia.Activa &&
-      nowSeconds <= saleDetails.garantia.fechaVencimiento && km <= saleDetails.garantia.kilometrajeMaximo;
+    const warrantyCovered = activeSaleDetails.garantia.estado === EstadoGarantia.Activa &&
+      nowSeconds <= activeSaleDetails.garantia.fechaVencimiento && km <= activeSaleDetails.garantia.kilometrajeMaximo;
     if (warrantyCovered) { toast.error("Este servicio aún está cubierto por la garantía. No se deben consumir puntos."); return; }
 
     setBusy(true); setQrError(null); setShowQrModal(true); preparingRef.current = false;
@@ -456,7 +468,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       const response = await fetch("/api/service-redemption", {
         method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
         body: JSON.stringify({
-          owner: connected.account.address, concesionario, cliente: selectedCustomer,
+          owner: connectedAccountAddress, concesionario, cliente: selectedCustomer,
           clienteNombre: selectedCustomerRecord.data.nombreCliente,
           clienteCedula: String(selectedCustomerRecord.data.cedulaCliente),
           walletAddress: wallet, mint, servicioId: selectedServiceRecord.id,
@@ -498,13 +510,13 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       {loading ? <p className="mt-4 text-xs text-[#68717b]">Consultando clientes, ventas y configuración en Solana…</p> : (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="text-[10px] font-semibold text-[#68717b]">Cliente registrado en el concesionario
-            <select value={selectedCustomer} onChange={(event) => { setSelectedCustomer(event.target.value); setSelectedSale(""); setReceipt(null); }} className="mt-1 w-full rounded-lg border border-[#e2e5e8] bg-white p-3 text-xs text-[#252a30]">
+            <select value={selectedCustomer} onChange={(event) => { setSelectedCustomer(event.target.value); setSelectedSale(""); setSaleDetails(null); setMileage(""); setReceipt(null); }} className="mt-1 w-full rounded-lg border border-[#e2e5e8] bg-white p-3 text-xs text-[#252a30]">
               <option value="">Selecciona un cliente</option>
               {customers.filter((customer) => sales.some((sale) => sale.data.cliente === customer.address)).map((customer) => <option key={customer.address} value={customer.address}>{customer.data.nombreCliente} · C.I. {customer.data.cedulaCliente}</option>)}
             </select>
           </label>
           <label className="text-[10px] font-semibold text-[#68717b]">Moto vendida (venta asociada)
-            <select value={selectedSale} onChange={(event) => setSelectedSale(event.target.value)} disabled={!customerSales.length} className="mt-1 w-full rounded-lg border border-[#e2e5e8] bg-white p-3 text-xs text-[#252a30]">
+            <select value={selectedSale} onChange={(event) => { setSelectedSale(event.target.value); setSaleDetails(null); setMileage(""); }} disabled={!customerSales.length} className="mt-1 w-full rounded-lg border border-[#e2e5e8] bg-white p-3 text-xs text-[#252a30]">
               <option value="">Selecciona una venta</option>
               {customerSales.map((sale) => <option key={sale.address} value={sale.address}>Moto {shortAddress(sale.data.moto)} · {new Date(Number(sale.data.fechaVenta) * 1000).toLocaleDateString("es-VE")}</option>)}
             </select>
@@ -517,7 +529,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
           </label>
           <label className="text-[10px] font-semibold text-[#68717b]">Kilometraje actual
             <input inputMode="numeric" value={mileage} onChange={(event) => setMileage(event.target.value.replace(/[^0-9]/g, ""))} placeholder="Ej. 12500" className="mt-1 w-full rounded-lg border border-[#e2e5e8] p-3 text-xs text-[#252a30]" />
-            <span className="mt-1 block text-[9px] font-normal text-[#858d96]">{saleDetails ? "Se precarga el último kilometraje conocido. No puedes introducir un valor inferior." : "Selecciona una venta para consultar el kilometraje de la moto."}</span>
+            <span className="mt-1 block text-[9px] font-normal text-[#858d96]">{activeSaleDetails ? "Se precarga el último kilometraje conocido. No puedes introducir un valor inferior." : "Selecciona una venta para consultar el kilometraje de la moto."}</span>
           </label>
         </div>
       )}
@@ -525,10 +537,10 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       {selectedCustomerRecord && <div className="mt-4 rounded-lg bg-[#f7f8fa] p-3 text-xs">
         <div className="flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Wallet vinculada</span><strong className="font-mono text-[#252a30]">{checking ? "Consultando…" : wallet ? shortAddress(wallet) : "No vinculada"}</strong></div>
         <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Saldo Token-2022</span><strong className="text-[#252a30]">{balance === null ? "—" : balance.toLocaleString("es-VE") + " puntos"}</strong></div>
-        {saleDetails && (
+        {activeSaleDetails && (
           <>
-            <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Moto / garantía</span><strong className="text-[#252a30]">{saleDetails.modelo} · {saleDetails.garantia.estado === EstadoGarantia.Activa ? "Activa" : "No activa"}</strong></div>
-            <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Último kilometraje registrado</span><strong className="text-[#252a30]">{saleDetails.kilometrajeActual.toLocaleString("es-VE")} km</strong></div>
+            <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Moto / garantía</span><strong className="text-[#252a30]">{activeSaleDetails.modelo} · {activeSaleDetails.garantia.estado === EstadoGarantia.Activa ? "Activa" : "No activa"}</strong></div>
+            <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Último kilometraje registrado</span><strong className="text-[#252a30]">{activeSaleDetails.kilometrajeActual.toLocaleString("es-VE")} km</strong></div>
           </>
         )}
       </div>}
