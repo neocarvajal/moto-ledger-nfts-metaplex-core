@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { address } from "@solana/kit";
 import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { toast } from "sonner";
@@ -21,14 +21,7 @@ export function SettingsManagement({
 }) {
   const client = useAppClient();
   const connected = useConnectedWallet(client);
-  const [duration, setDuration] = useState(String(data.duracionGarantiaDias));
-  const [maxMileage, setMaxMileage] = useState(data.kilometrajeMaximo.toString());
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    setDuration(String(data.duracionGarantiaDias));
-    setMaxMileage(data.kilometrajeMaximo.toString());
-  }, [concesionario, data.duracionGarantiaDias, data.kilometrajeMaximo]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -37,7 +30,9 @@ export function SettingsManagement({
       return;
     }
 
-    const days = Number(duration);
+    const formData = new FormData(event.currentTarget);
+    const days = Number(formData.get("duration"));
+    const mileageValue = String(formData.get("maxMileage") ?? "");
     let mileage: bigint;
     try {
       if (!Number.isInteger(days) || days < 1 || days > 65_535) {
@@ -46,7 +41,7 @@ export function SettingsManagement({
       if (!/^\d+$/.test(maxMileage.trim())) {
         throw new Error("El kilometraje máximo debe ser un entero positivo.");
       }
-      mileage = BigInt(maxMileage);
+      mileage = BigInt(mileageValue);
       if (mileage < 1n || mileage > U64_MAX) {
         throw new Error("El kilometraje máximo debe estar entre 1 y el límite u64.");
       }
@@ -137,12 +132,12 @@ export function SettingsManagement({
           <p className="mt-1 text-[10px] text-[#858d96]">Define la cobertura que se aplicará a las próximas motos que registres.</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        <form key={`${concesionario}:${data.duracionGarantiaDias}:${data.kilometrajeMaximo}`} onSubmit={handleSubmit} className="mt-5 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Duración de garantía</span>
               <div className="relative">
-                <input type="number" min={1} max={65535} step={1} value={duration} onChange={(event) => setDuration(event.target.value)} disabled={busy} required className="w-full rounded-lg border border-[#e2e5e8] px-3 py-3 pr-16 text-[12px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
+                <input type="number" min={1} max={65535} step={1} name="duration" defaultValue={String(data.duracionGarantiaDias)} disabled={busy} required className="w-full rounded-lg border border-[#e2e5e8] px-3 py-3 pr-16 text-[12px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[#9299a1]">días</span>
               </div>
               <span className="mt-1 block text-[9px] text-[#a0a6ad]">Entero entre 1 y 65.535 días.</span>
@@ -150,7 +145,7 @@ export function SettingsManagement({
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Kilometraje máximo cubierto</span>
               <div className="relative">
-                <input type="number" min={1} step={1} value={maxMileage} onChange={(event) => setMaxMileage(event.target.value)} disabled={busy} required className="w-full rounded-lg border border-[#e2e5e8] px-3 py-3 pr-14 text-[12px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
+                <input type="number" min={1} step={1} name="maxMileage" defaultValue={data.kilometrajeMaximo.toString()} disabled={busy} required className="w-full rounded-lg border border-[#e2e5e8] px-3 py-3 pr-14 text-[12px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[#9299a1]">km</span>
               </div>
               <span className="mt-1 block text-[9px] text-[#a0a6ad]">Número entero positivo, sin decimales.</span>
