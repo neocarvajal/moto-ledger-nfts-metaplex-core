@@ -82,10 +82,17 @@ pub mod registro {
     /// Updates the three milestone metadata URIs without changing the registered collection.
     pub fn actualizar_metadata_reconocimientos(
         context: Context<ActualizarMetadataReconocimientos>,
+        collection_metadata_uri: String,
         hito_1_metadata_uri: String,
         hito_3_metadata_uri: String,
         hito_5_metadata_uri: String,
     ) -> Result<()> {
+        require!(
+            !collection_metadata_uri.is_empty()
+                && collection_metadata_uri.len() <= ReconocimientoColeccion::MAX_URI_LEN
+                && collection_metadata_uri.starts_with("https://"),
+            Errores::MetadataUriInvalida
+        );
         for uri in [&hito_1_metadata_uri, &hito_3_metadata_uri, &hito_5_metadata_uri] {
             require!(
                 uri.is_empty()
@@ -96,6 +103,7 @@ pub mod registro {
         }
 
         let config = &mut context.accounts.reconocimiento_coleccion;
+        config.collection_metadata_uri = collection_metadata_uri;
         config.hito_1_metadata_uri = hito_1_metadata_uri;
         config.hito_3_metadata_uri = hito_3_metadata_uri;
         config.hito_5_metadata_uri = hito_5_metadata_uri;
