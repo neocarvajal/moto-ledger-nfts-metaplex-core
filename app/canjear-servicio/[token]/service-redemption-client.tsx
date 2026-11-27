@@ -51,14 +51,15 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
     const response = await fetch(`/api/service-redemption/${token}`, { cache: "no-store" });
     const payload = (await response.json()) as Session & { error?: string };
     if (!response.ok) throw new Error(payload.error ?? "La solicitud expiró.");
-    setSession(payload);
     return payload;
   }, [token]);
 
   useEffect(() => {
     let active = true;
     void loadSession().then((data) => {
-      if (active && data.cluster !== cluster) setCluster(data.cluster);
+      if (!active) return;
+      setSession(data);
+      if (data.cluster !== cluster) setCluster(data.cluster);
     }).catch((cause) => {
       if (active) setError(cause instanceof Error ? cause.message : "No se pudo cargar el canje.");
     }).finally(() => { if (active) setLoading(false); });
@@ -69,7 +70,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
     if (!session || ["completed", "cancelled"].includes(session.status)) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     const poll = window.setInterval(() => {
-      void loadSession().catch((cause) => setError(cause instanceof Error ? cause.message : "No se pudo actualizar la solicitud."));
+      void loadSession().then(setSession).catch((cause) => setError(cause instanceof Error ? cause.message : "No se pudo actualizar la solicitud."));
     }, 2000);
     return () => { window.clearInterval(timer); window.clearInterval(poll); };
   }, [session?.status, session?.expiresAt, loadSession]);
@@ -87,7 +88,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
     }).then(async (response) => {
       const payload = await response.json() as { error?: string };
       if (!response.ok) throw new Error(payload.error ?? "No se pudo avisar al concesionario.");
-      await loadSession();
+      setSession(await loadSession());
     }).catch((cause) => {
       readyRequestedRef.current = null;
       setError(cause instanceof Error ? cause.message : "No se pudo avisar al concesionario.");
@@ -154,7 +155,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error ?? "No se pudo entregar la firma.");
-      await loadSession();
+      setSession(await loadSession());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo firmar el canje.");
     } finally {
