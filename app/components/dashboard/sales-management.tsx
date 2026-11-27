@@ -514,7 +514,9 @@ export function SalesManagement({
               dealerAddress,
               milestone
             );
-            if (!alreadyIssued) {
+            if (alreadyIssued) {
+              eligibleRecognitionMilestone = null;
+            } else {
               const built = await buildRecognitionAssetInstructions({
                 cluster,
                 owner,
