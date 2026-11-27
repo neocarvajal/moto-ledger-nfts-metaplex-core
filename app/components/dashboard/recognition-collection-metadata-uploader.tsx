@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { address } from "@solana/kit";
 import type { AppClient, ClusterMoniker } from "../../lib/solana-client";
 
 export function RecognitionCollectionMetadataUploader({
@@ -45,7 +46,7 @@ export function RecognitionCollectionMetadataUploader({
     let metadataSymbol = symbol.trim().toUpperCase();
     let metadataDescription = description.trim();
     if (mode === "automatic") {
-      const dealer = await client.registro.accounts.concesionario.fetch(dealership as never);
+      const dealer = await client.registro.accounts.concesionario.fetch(address(dealership));
       const dealerName = dealer.data.nombreConcesionario;
       const dealerId = dealer.data.idConcesionario;
       metadataName = dealerName + " | Reconocimientos #" + dealerId;
