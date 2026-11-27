@@ -210,7 +210,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     } finally {
       setLoading(false);
     }
-  }, [client, concesionario, connected]);
+  }, [client, concesionario, connected, connectedAccountAddress]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -363,8 +363,9 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     const payload = await response.json() as { error?: string };
     if (!response.ok) throw new Error(payload.error ?? "No se pudo entregar la transacción al cliente.");
     setSession((current) => current?.token === token ? { ...current, status: "waiting_customer_signature" } : current);
-  }, [client, connected, selectedCustomerRecord, selectedSaleRecord,
-    selectedServiceRecord, wallet, mint, mileage, concesionario, selectedCustomer]);
+  }, [client, connected, connectedAccountAddress, connectedSigner,
+    selectedCustomerRecord, selectedSaleRecord, selectedServiceRecord,
+    wallet, mint, mileage, concesionario, selectedCustomer]);
 
   useEffect(() => {
     if (!session) return;
