@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import milestone1Image from "@/assets/recognitions/milestone-1.jpg";
+import milestone3Image from "@/assets/recognitions/milestone-3.jpg";
+import milestone5Image from "@/assets/recognitions/milestone-5.jpg";
 import type { AppClient } from "../../lib/solana-client";
 import type { ClusterMoniker } from "../../lib/solana-client";
 import {
@@ -10,6 +13,7 @@ import {
 } from "../../lib/moto-ledger/recognitions";
 
 const MILESTONES: RecognitionMilestone[] = [1, 3, 5];
+const DEFAULT_IMAGES = { 1: milestone1Image, 3: milestone3Image, 5: milestone5Image };
 const LABELS: Record<RecognitionMilestone, { name: string; description: string }> = {
   1: { name: "PRIMERA COMPRA", description: "El comienzo de una gran relación" },
   3: { name: "CLIENTE FRECUENTE", description: "Tu confianza nos impulsa" },
@@ -34,6 +38,16 @@ export function RecognitionMilestoneUploader({
   const [files, setFiles] = useState<Partial<Record<RecognitionMilestone, File>>>({});
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+
+  const resolveImageFile = async (milestone: RecognitionMilestone) => {
+    const selected = files[milestone];
+    if (selected) return selected;
+    const image = DEFAULT_IMAGES[milestone];
+    const response = await fetch(image.src);
+    if (!response.ok) throw new Error("No se pudo cargar la imagen JPG del hito " + milestone + ".");
+    const blob = await response.blob();
+    return new File([blob], "milestone-" + milestone + ".jpg", { type: "image/jpeg" });
+  };
 
   const upload = async (milestone: RecognitionMilestone, file: File) => {
     if (cluster !== "devnet" && cluster !== "mainnet") {
@@ -89,8 +103,7 @@ export function RecognitionMilestoneUploader({
   };
 
   const saveMilestone = async (milestone: RecognitionMilestone, baseConfig: RecognitionConfig = config): Promise<RecognitionConfig> => {
-    const file = files[milestone];
-    if (!file) throw new Error("Selecciona la imagen del hito " + milestone + ".");
+    const file = await resolveImageFile(milestone);
     const metadata = await upload(milestone, file);
     const next: RecognitionConfig = {
       ...baseConfig,
@@ -117,7 +130,7 @@ export function RecognitionMilestoneUploader({
 
   const uploadAll = async () => {
     const missing = MILESTONES.filter((milestone) =>
-      !files[milestone] && !config.milestones?.[milestone]
+      !DEFAULT_IMAGES[milestone] && !files[milestone] && !config.milestones?.[milestone]
     );
     if (missing.length) {
       setStatus("Faltan imágenes para los hitos: " + missing.join(", ") + ".");
@@ -156,16 +169,16 @@ export function RecognitionMilestoneUploader({
           return (
             <div key={milestone} className="rounded-lg border border-[#edf0f2] p-3">
               <p className="text-[10px] font-bold text-[#252a30]">Hito {milestone} · {LABELS[milestone].name}</p>
-              <p className="mt-1 text-[9px] text-[#858d96]">{saved ? "Metadata configurada" : "Pendiente de imagen"}</p>
-              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setFiles((current) => ({ ...current, [milestone]: event.target.files?.[0] }))} className="mt-3 block w-full text-[9px] text-[#68717b] file:mr-2 file:rounded-md file:border-0 file:bg-[#f2f3f5] file:px-2 file:py-1.5 file:text-[9px] file:font-semibold" />
+              <p className="mt-1 text-[9px] text-[#858d96]">{saved ? "Metadata configurada" : "JPG incluido en assets/recognitions"}</p>
+              <input type="file" accept="image/jpeg" onChange={(event) => setFiles((current) => ({ ...current, [milestone]: event.target.files?.[0] }))} className="mt-3 block w-full text-[9px] text-[#68717b] file:mr-2 file:rounded-md file:border-0 file:bg-[#f2f3f5] file:px-2 file:py-1.5 file:text-[9px] file:font-semibold" />
               {saved?.metadataUri && <a href={saved.metadataUri} target="_blank" rel="noopener noreferrer" className="mt-2 block break-all text-[9px] text-[#16845a] underline">Ver JSON en IPFS ↗</a>}
-              <button type="button" onClick={() => void uploadOne(milestone)} disabled={busy || !files[milestone]} className="mt-3 rounded-md border border-[#e2e5e8] px-3 py-2 text-[9px] font-semibold text-[#555e68] disabled:opacity-40">Subir solo este hito</button>
+              <button type="button" onClick={() => void uploadOne(milestone)} disabled={busy} className="mt-3 rounded-md border border-[#e2e5e8] px-3 py-2 text-[9px] font-semibold text-[#555e68] disabled:opacity-40">Subir solo este hito</button>
             </div>
           );
         })}
       </div>
       {status && <p className="mt-3 text-[10px] text-[#68717b]" role="status">{status}</p>}
-      <p className="mt-3 text-[9px] text-[#9299a1]">La wallet propietaria firma una autorización para cada carga. Las imágenes se suben a Pinata y las URI se guardan en la configuración local de este concesionario y red.</p>
+      <p className="mt-3 text-[9px] text-[#9299a1]">Se utilizan por defecto los JPG versionados en assets/recognitions. Puedes sustituir cualquiera desde el selector. La wallet propietaria firma cada carga; las imágenes y JSON se suben a Pinata.</p>
     </section>
   );
 }
