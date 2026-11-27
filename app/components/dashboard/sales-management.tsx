@@ -651,7 +651,11 @@ export function SalesManagement({
           ? `El reconocimiento del hito ${eligibleRecognitionMilestone} quedó pendiente de emisión.`
           : "";
       if (eligibleRecognitionMilestone && !recognitionIssued) {
-        toast.warning("La venta se registró correctamente. El reconocimiento NFT quedó pendiente y podrás emitirlo desde Reconocimientos.");
+        toast.warning(
+          recognitionPreparationError
+            ? `La venta se registró. El NFT quedó pendiente: ${recognitionPreparationError}`
+            : "La venta se registró correctamente. El reconocimiento NFT quedó pendiente y podrás emitirlo desde Reconocimientos."
+        );
       }
       const successMessage = [
         "Venta registrada correctamente en Solana.",
