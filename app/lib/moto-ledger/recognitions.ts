@@ -24,9 +24,22 @@ export const RECOGNITION_MILESTONES = [1, 3, 5] as const;
 
 export type RecognitionMilestone = (typeof RECOGNITION_MILESTONES)[number];
 
+export type RecognitionMetadata = {
+  name: string;
+  symbol: string;
+  description: string;
+  imageUri: string;
+  metadataUri: string;
+  imageCid?: string;
+  metadataCid?: string;
+};
+
 export type RecognitionConfig = {
   collection: string;
-  metadataUri: string;
+  collectionMetadata?: RecognitionMetadata;
+  milestones?: Partial<Record<RecognitionMilestone, RecognitionMetadata>>;
+  /** Legacy collection metadata URI; retained for old local configurations. */
+  metadataUri?: string;
 };
 
 export type IssuedRecognition = {
@@ -68,11 +81,23 @@ export function readRecognitionConfig(
     const raw = localStorage.getItem(storageKey(owner, dealership, cluster));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<RecognitionConfig>;
-    if (
-      typeof parsed.collection !== "string" ||
-      typeof parsed.metadataUri !== "string"
-    ) return null;
-    return { collection: parsed.collection, metadataUri: parsed.metadataUri };
+    if (typeof parsed.collection !== "string") return null;
+    const legacyUri = typeof parsed.metadataUri === "string" ? parsed.metadataUri : undefined;
+    const collectionMetadata =
+      parsed.collectionMetadata && typeof parsed.collectionMetadata.metadataUri === "string"
+        ? parsed.collectionMetadata
+        : legacyUri
+          ? { name: "", symbol: "", description: "", imageUri: "", metadataUri: legacyUri }
+          : undefined;
+    const milestones = parsed.milestones && typeof parsed.milestones === "object"
+      ? parsed.milestones
+      : {};
+    return {
+      collection: parsed.collection,
+      ...(collectionMetadata ? { collectionMetadata } : {}),
+      milestones,
+      ...(legacyUri ? { metadataUri: legacyUri } : {}),
+    };
   } catch {
     return null;
   }
