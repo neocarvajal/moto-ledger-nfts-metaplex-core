@@ -57,24 +57,27 @@ El contador `Cliente.total_motos_cliente` es global para la identidad del client
 ### Configurar la colección
 
 1. Conecta la wallet owner y selecciona el concesionario.
-2. Abre **Reconocimientos NFT**.
-3. Prepara un JSON público de metadata en Pinata/IPFS. Ejemplo mínimo:
+2. Abre **Reconocimientos NFT**. En **Metadata de la colección**, elige:
+   - **Automática:** MotoLedger consulta el nombre y el ID on-chain del concesionario, genera una portada propia y prepara nombre, símbolo y descripción únicos.
+   - **Personalizada:** carga una imagen e introduce el nombre, símbolo y descripción que quieras.
+3. Pulsa **Generar y subir metadata**. La wallet owner firma una autorización de carga; el servidor verifica esa firma y que la wallet sea propietaria de la cuenta `Concesionario`, y después sube la imagen y el JSON a Pinata.
+4. Cuando aparezca la URL HTTPS de IPFS, pulsa **Crear colección** y aprueba la transacción. La colección queda bajo la autoridad de la wallet owner.
 
-   ```json
-   {
-     "name": "Reconocimiento MotoLedger",
-     "description": "Certificado por alcanzar un hito de compras en el concesionario.",
-     "image": "https://<gateway-publico>/ipfs/<CID-DE-IMAGEN>"
-   }
-   ```
+Se crea una sola colección por concesionario. Su metadata e imagen son independientes de las imágenes de los hitos. La dirección de la colección y sus ajustes se guardan en el navegador, asociados al cluster, wallet owner y concesionario. Si cambias de navegador o limpias el almacenamiento, utiliza **Vincular colección existente**.
 
-4. Copia la URL HTTPS pública del JSON (por ejemplo, `https://<gateway-publico>/ipfs/<CID-DE-METADATA>`) y pulsa **Crear colección**.
-5. Aprueba la transacción con la wallet owner. La colección queda bajo la autoridad de esa wallet y los NFT serán pagados por el owner.
+### Metadata de los hitos
 
-Se crea una colección por concesionario. La dirección y la URL se guardan en el navegador, asociadas al cluster, wallet owner y concesionario. Si cambias de navegador o limpias el almacenamiento, utiliza **Vincular colección existente** e introduce la dirección de la colección y su URI de metadata.
+Después de crear o vincular la colección, carga las tres imágenes en **Imágenes de los hitos**:
 
-Para el almacenamiento IPFS se utiliza Pinata. El proyecto ya contempla las variables `PINATA_JWT` y `NEXT_PUBLIC_GATEWAY_URL` para sus flujos de metadata; la URI que se introduce en Reconocimientos debe ser una URL HTTPS pública que devuelva el JSON, no una página HTML de GitHub ni una URI `ipfs://`.
+- **Hito 1:** PRIMERA COMPRA.
+- **Hito 3:** CLIENTE FRECUENTE.
+- **Hito 5:** CLIENTE DESTACADO.
 
+Puedes seleccionar las tres imágenes y pulsar **Subir los tres hitos**, o subir cada una por separado. Cada carga crea su propio archivo de imagen y JSON público en Pinata; las URI quedan guardadas por concesionario y red. También puedes reemplazar un hito cargando una nueva imagen individualmente. La wallet owner autoriza cada carga mediante firma de mensaje; `PINATA_JWT` permanece exclusivamente en el servidor.
+
+El JSON incluye `name`, `symbol`, `description`, `image`, `properties.files` y atributos de plataforma/hito. Los datos de cliente, venta y concesionario no se incorporan a la metadata pública: los atributos específicos de la emisión se guardan en el Asset Metaplex Core.
+
+Para almacenamiento IPFS se utilizan `PINATA_JWT` y `NEXT_PUBLIC_GATEWAY_URL`. La URL generada debe ser HTTPS y apuntar al JSON del gateway público, no a una página HTML de GitHub ni a una URI `ipfs://`.
 ### Flujo de emisión
 
 - **Venta con wallet vinculada:** si la colección está configurada y la venta alcanza exactamente el siguiente hito (1, 3 o 5), la aplicación añade la instrucción Metaplex Core a la misma transacción que registra la venta. Si también corresponde emitir puntos Token-2022, las instrucciones de venta, puntos y NFT se envían juntas.
