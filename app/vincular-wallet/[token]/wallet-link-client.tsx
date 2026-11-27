@@ -89,7 +89,7 @@ export function WalletLinkClient({ token }: { token: string }) {
   }, [sessionStatus]);
 
   useEffect(() => {
-    if (!session || sessionStatus === "completed" || sessionStatus === "cancelled") return;
+    if (!sessionStatus || sessionStatus === "completed" || sessionStatus === "cancelled") return;
     let active = true;
     const poll = async () => {
       try {
