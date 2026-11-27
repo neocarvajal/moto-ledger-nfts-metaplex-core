@@ -121,12 +121,12 @@ vi.mock("../../app/components/dashboard/settings-management", () => ({
 function setAccountResults() {
   mocks.client.rpc.getProgramAccounts.mockReturnValue({
     send: vi.fn().mockResolvedValue([
-      { pubkey: "dealership-b", account: { data: ["b", "base64"] } },
-      { pubkey: "dealership-a", account: { data: ["a", "base64"] } },
+      { pubkey: "dealership-b", account: { data: ["MOTOS TORO", "base64"] } },
+      { pubkey: "dealership-a", account: { data: ["BERA MOTORS", "base64"] } },
     ]),
   });
   mocks.decode.mockImplementation((bytes: unknown) =>
-    String(bytes).startsWith("a") ? mocks.dealershipA : mocks.dealershipB
+    String(bytes).includes("BERA") ? mocks.dealershipA : mocks.dealershipB
   );
 }
 
@@ -162,7 +162,7 @@ describe("MotoLedger dealership workspace", () => {
       expect(screen.getByRole("option", { name: /MOTOS TORO/ })).toBeTruthy();
     });
 
-    const selector = screen.getByRole("combobox") as HTMLSelectElement;
+    const selector = (await screen.findByRole("combobox")) as HTMLSelectElement;
     expect(selector.value).toBe("");
     expect(Array.from(selector.options).map((option) => option.value)).toEqual([
       "dealership-a",
@@ -185,8 +185,8 @@ describe("MotoLedger dealership workspace", () => {
     const selector = await screen.findByRole("combobox");
     fireEvent.change(selector, { target: { value: "dealership-b" } });
 
+    expect(await screen.findByText("J345678901")).toBeTruthy();
     expect(screen.getByRole("option", { name: /MOTOS TORO/ })).toBeTruthy();
-    expect(screen.getByText("J345678901")).toBeTruthy();
   });
 
   it("registers a new dealership and selects the fetched on-chain account", async () => {
