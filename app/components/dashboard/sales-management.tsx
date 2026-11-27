@@ -473,7 +473,7 @@ export function SalesManagement({
           }
         ).send();
         const milestone = recognitionMilestone(priorSales.length + 1);
-        if (milestone) {
+        if (milestone && recognitionConfig.milestones?.[milestone]?.metadataUri) {
           const alreadyIssued = await recognitionAlreadyIssued(
             cluster,
             recognitionConfig.collection,
@@ -487,7 +487,7 @@ export function SalesManagement({
               owner,
               ownerSigner: connected.signer,
               collection: recognitionConfig.collection,
-              metadataUri: recognitionConfig.metadataUri,
+              metadataUri: recognitionConfig.milestones[milestone].metadataUri,
               customerWallet: customerWalletAddress,
               customer: cliente,
               dealership: dealerAddress,
