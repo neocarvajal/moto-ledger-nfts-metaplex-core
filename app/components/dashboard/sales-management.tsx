@@ -49,7 +49,6 @@ import {
   type Venta,
 } from "../../lib/moto-ledger/src/generated/accounts/venta";
 import {
-  getClienteDecoder,
   type Cliente,
 } from "../../lib/moto-ledger/src/generated/accounts/cliente";
 import {
