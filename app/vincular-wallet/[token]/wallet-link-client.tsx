@@ -45,7 +45,7 @@ export function WalletLinkClient({ token }: { token: string }) {
   const [message, setMessage] = useState("Cargando solicitud segura…");
   const [now, setNow] = useState(() => Date.now());
   const [walletSelectionConfirmed, setWalletSelectionConfirmed] = useState(false);
-  const signingRef = useRef(false);
+  const [signing, setSigning] = useState(false);
   const walletSentRef = useRef(false);
 
   const loadSession = useCallback(async () => {
@@ -120,12 +120,12 @@ export function WalletLinkClient({ token }: { token: string }) {
   }, [walletSelectionConfirmed, connected?.account.address, session, token, loadSession]);
 
   const signTransaction = async () => {
-    if (!connected || !session?.transaction || session.signedTransaction || signingRef.current) return;
+    if (!connected || !session?.transaction || session.signedTransaction || signing) return;
     const walletAddress = connected.account.address;
     const walletSigner = connected.signer;
     if (!walletAddress || !walletSigner || session.walletAddress !== walletAddress) return;
 
-    signingRef.current = true;
+    setSigning(true);
     setError(null);
     setMessage("Abriendo la solicitud de firma en tu wallet…");
     try {
@@ -152,7 +152,7 @@ export function WalletLinkClient({ token }: { token: string }) {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo firmar la transacción.");
     } finally {
-      signingRef.current = false;
+      setSigning(false);
     }
   };
 
@@ -304,7 +304,7 @@ export function WalletLinkClient({ token }: { token: string }) {
                   <button
                     type="button"
                     onClick={() => void signTransaction()}
-                    disabled={signingRef.current || session.expiresAt <= now}
+                    disabled={signing || session.expiresAt <= now}
                     className="mt-4 w-full rounded-xl bg-[#e60012] px-4 py-3 text-xs font-bold text-white transition hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Firmar vinculación en Solflare
