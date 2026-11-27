@@ -47,6 +47,10 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
   const [signing, setSigning] = useState(false);
   const [verifiedReceiptKey, setVerifiedReceiptKey] = useState<string | null>(null);
   const readyRequestedRef = useRef<string | null>(null);
+  const sessionStatus = session?.status;
+  const sessionExpiresAt = session?.expiresAt;
+  const sessionWalletAddress = session?.walletAddress;
+  const connectedWalletAddress = connected?.account.address;
 
   const loadSession = useCallback(async () => {
     const response = await fetch(`/api/service-redemption/${token}`, { cache: "no-store" });
@@ -68,24 +72,26 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
   }, [loadSession, cluster, setCluster]);
 
   useEffect(() => {
-    if (!session || ["completed", "cancelled"].includes(session.status)) return;
+    if (!sessionStatus || ["completed", "cancelled"].includes(sessionStatus)) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     const poll = window.setInterval(() => {
       void loadSession().then(setSession).catch((cause) => setError(cause instanceof Error ? cause.message : "No se pudo actualizar la solicitud."));
     }, 2000);
     return () => { window.clearInterval(timer); window.clearInterval(poll); };
-  }, [session?.status, session?.expiresAt, loadSession]);
+  }, [sessionStatus, sessionExpiresAt, loadSession]);
 
   useEffect(() => {
-    if (!session || session.status !== "waiting_customer_ready" ||
-        connected?.account.address !== session.walletAddress ||
-        readyRequestedRef.current === token) return;
+    if (
+      sessionStatus !== "waiting_customer_ready" ||
+      connectedWalletAddress !== sessionWalletAddress ||
+      readyRequestedRef.current === token
+    ) return;
     readyRequestedRef.current = token;
     void fetch(`/api/service-redemption/${token}/ready`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
-      body: JSON.stringify({ walletAddress: connected.account.address }),
+      body: JSON.stringify({ walletAddress: connectedWalletAddress }),
     }).then(async (response) => {
       const payload = await response.json() as { error?: string };
       if (!response.ok) throw new Error(payload.error ?? "No se pudo avisar al concesionario.");
@@ -94,7 +100,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
       readyRequestedRef.current = null;
       setError(cause instanceof Error ? cause.message : "No se pudo avisar al concesionario.");
     });
-  }, [session?.status, session?.walletAddress, connected?.account.address, token, loadSession]);
+  }, [sessionStatus, sessionWalletAddress, connectedWalletAddress, token, loadSession]);
 
   const signedSession = session?.status === "signed" ? session : null;
   const signedCliente = signedSession?.cliente;
