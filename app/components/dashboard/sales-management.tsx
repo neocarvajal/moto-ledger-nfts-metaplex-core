@@ -223,7 +223,10 @@ export function SalesManagement({
   }, [client, concesionario]);
 
   useEffect(() => {
-    void loadData();
+    const timer = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadData]);
 
   const checkCustomerWallet = useCallback(async (customerPda: string) => {
@@ -311,10 +314,13 @@ export function SalesManagement({
     } finally {
       setLoadingCustomers(false);
     }
-  }, [checkCustomerWallet, client, connected?.account.address, concesionario]);
+  }, [client, connected?.account.address, concesionario]);
 
   useEffect(() => {
-    void loadCustomers();
+    const timer = window.setTimeout(() => {
+      void loadCustomers();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadCustomers]);
 
   const lookupCustomer = async (value: string) => {
