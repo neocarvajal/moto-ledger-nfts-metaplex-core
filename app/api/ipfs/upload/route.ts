@@ -264,11 +264,11 @@ export async function POST(request: Request) {
       description,
       image: imageUri,
       ...(attributes.length ? { attributes } : {}),
-      properties: { files: [{ uri: imageUri, type: file.type }], category: "image" },
+      ...(purpose !== "token" ? { properties: { files: [{ uri: imageUri, type: file.type }], category: "image" } } : {}),
     };
     const metadataFile = new File(
       [JSON.stringify(metadata, null, 2)],
-      `${symbol}-metadata.json`,
+      `${symbol}-${purpose}-metadata${milestoneValue ? `-${milestoneValue}` : ""}.json`,
       { type: "application/json" }
     );
     pinataStage = "subida de metadata JSON";
