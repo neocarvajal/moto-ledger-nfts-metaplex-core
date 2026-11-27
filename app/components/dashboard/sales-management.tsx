@@ -454,8 +454,12 @@ export function SalesManagement({
       // NFT milestones are counted from Venta records for this dealership/customer pair.
       // Cliente.totalMotosCliente is global across dealerships and is not suitable here.
       if (walletInfo.value) {
-        const linkedWallet = await client.registro.accounts.walletCliente.fetch(walletCliente);
-        customerWalletAddress = linkedWallet.data.wallet;
+        try {
+          const linkedWallet = await client.registro.accounts.walletCliente.fetch(walletCliente);
+          customerWalletAddress = linkedWallet.data.wallet;
+        } catch (walletLookupError) {
+          console.warn("No se pudo consultar la wallet del cliente; la venta continuará sin emisión NFT automática:", walletLookupError);
+        }
       }
       let eligibleRecognitionMilestone: number | null = null;
       let recognitionPreparationError: string | null = null;
