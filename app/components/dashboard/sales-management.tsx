@@ -21,7 +21,6 @@ import { useAppClient } from "../../lib/client-provider";
 import { useCluster } from "../cluster-context";
 import {
   buildRecognitionAssetInstructions,
-  readRecognitionConfig,
   recognitionAlreadyIssued,
   recognitionMilestone,
 } from "../../lib/moto-ledger/recognitions";
@@ -32,11 +31,13 @@ import {
   deriveClientePda,
   deriveProgramaFidelidadPda,
   derivePuntosVentaPda,
+  deriveReconocimientoColeccionPda,
   deriveToken2022Ata,
   deriveVentaPda,
   deriveWalletClientePda,
 } from "../../lib/moto-ledger/pdas";
 import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
+import { fetchReconocimientoColeccion } from "../../lib/moto-ledger/src/generated/accounts/reconocimientoColeccion";
 import {
   getMotoDecoder,
   getMotoDiscriminatorBytes,
@@ -454,7 +455,32 @@ export function SalesManagement({
         const linkedWallet = await client.registro.accounts.walletCliente.fetch(walletCliente);
         customerWalletAddress = linkedWallet.data.wallet;
       }
-      const recognitionConfig = readRecognitionConfig(owner, dealerAddress, cluster);
+      const [recognitionConfigPda] = await deriveReconocimientoColeccionPda(dealerAddress);
+      const recognitionConfigInfo = await client.rpc
+        .getAccountInfo(recognitionConfigPda, { encoding: "base64" })
+        .send();
+      let recognitionConfig: {
+        collection: string;
+        metadataUri: string;
+        milestones: Partial<Record<1 | 3 | 5, { metadataUri: string }>>;
+      } | null = null;
+      if (recognitionConfigInfo.value) {
+        const recognitionAccount = await fetchReconocimientoColeccion(client.rpc, recognitionConfigPda);
+        if (
+          recognitionAccount.data.owner === owner &&
+          recognitionAccount.data.concesionario === dealerAddress
+        ) {
+          recognitionConfig = {
+            collection: recognitionAccount.data.collection,
+            metadataUri: recognitionAccount.data.collectionMetadataUri,
+            milestones: {
+              1: { metadataUri: recognitionAccount.data.hito1MetadataUri },
+              3: { metadataUri: recognitionAccount.data.hito3MetadataUri },
+              5: { metadataUri: recognitionAccount.data.hito5MetadataUri },
+            },
+          };
+        }
+      }
       if (recognitionConfig && customerWalletAddress) {
         const saleDiscriminator = getBase58Decoder().decode(
           getVentaDiscriminatorBytes()
