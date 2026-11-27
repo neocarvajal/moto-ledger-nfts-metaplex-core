@@ -110,7 +110,10 @@ export function CustomerManagement({
   }, [client, connected, concesionario]);
 
   useEffect(() => {
-    void loadCustomers();
+    const timer = window.setTimeout(() => {
+      void loadCustomers();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadCustomers]);
 
   useEffect(() => {
