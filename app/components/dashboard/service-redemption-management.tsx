@@ -28,7 +28,6 @@ import {
   deriveCanjeServicioPda,
   deriveCatalogoServiciosPda,
   deriveKilometrajeMotoPda,
-  deriveClientePda,
   deriveProgramaFidelidadPda,
   deriveToken2022Ata,
   deriveWalletClientePda,
@@ -87,7 +86,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [session, setSession] = useState<RedemptionSession | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [showQrModal, setShowQrModal] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
