@@ -165,3 +165,11 @@ export async function deriveToken2022Ata(owner: Address, mint: Address) {
     tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
   });
 }
+
+/** On-chain recognition collection configuration, unique per dealership. */
+export async function deriveReconocimientoColeccionPda(concesionario: Address) {
+  return getProgramDerivedAddress({
+    programAddress: REGISTRO_PROGRAM_ADDRESS,
+    seeds: [seed("reconocimiento_coleccion"), key(concesionario)],
+  });
+}
