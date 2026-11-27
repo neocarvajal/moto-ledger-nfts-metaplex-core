@@ -18,10 +18,12 @@ El foco de este proyecto es la creación y administración de colecciones Core y
 2. **Calcular el progreso.** La aplicación consulta las ventas que pertenecen al mismo par concesionario/cliente. El progreso es independiente para cada concesionario; no utiliza el contador global del cliente.
 3. **Configurar la colección.** El concesionario crea una colección Metaplex Core y registra su dirección y metadata en la PDA `ReconocimientoColeccion`.
 4. **Preparar los hitos.** Se cargan las imágenes y los JSON de metadata para los reconocimientos de primera compra, cliente frecuente y cliente destacado.
-5. **Emitir el NFT.** Al alcanzar los hitos de 1, 3 o 5 ventas, la aplicación crea un Asset Core dentro de la colección del concesionario y lo asigna a la wallet destinataria del cliente.
-6. **Consultar el historial.** El dashboard muestra los hitos alcanzados, los reconocimientos emitidos y los enlaces a Solana Explorer.
+5. **Preparar la emisión.** La colección Core debe estar registrada en la PDA del concesionario, las URI de metadata de los hitos deben estar guardadas en Solana y el cliente debe tener una wallet destinataria vinculada.
+6. **Emitir automáticamente.** Al confirmar una venta que completa el hito 1, 3 o 5, MotoLedger registra primero la venta (y la recompensa Token-2022, si aplica). Después envía una transacción independiente para crear el Asset Core y asignarlo a la wallet del cliente.
+7. **Procesar el histórico.** El módulo **Reconocimientos NFT** compara las ventas acumuladas con los Assets de la colección. Permite emitir los reconocimientos pendientes individualmente o en lote, incluidos los hitos alcanzados antes de configurar la colección.
+8. **Consultar el historial.** El dashboard muestra el progreso, los pendientes, los NFT emitidos y los enlaces a Solana Explorer.
 
-La emisión puede incluirse en la misma transacción que registra la venta cuando la colección, la metadata y la wallet destinataria están disponibles. Si falta algún requisito, la venta puede registrarse sin emitir el NFT; el reconocimiento elegible queda pendiente para su emisión posterior desde el módulo **Reconocimientos NFT**.
+La emisión NFT es independiente de la confirmación de la venta: si Core falla, la venta permanece registrada y el reconocimiento queda pendiente para reintentar desde **Reconocimientos NFT**. Los hitos históricos pueden procesarse después de configurar la colección y la metadata.
 
 ## Hitos y colección visual
 
@@ -109,8 +111,9 @@ Los Assets se crean con el plugin `PermanentFreezeDelegate`, `frozen: true` y la
 
 - Los hitos se calculan por concesionario y cliente a partir de las cuentas `Venta`.
 - La aplicación consulta los Assets Core para evitar emitir dos veces el mismo reconocimiento.
-- La venta y la creación del NFT pueden confirmarse de forma atómica cuando ambas instrucciones se envían en una misma transacción. Si una instrucción falla, la transacción completa se revierte.
-- La regla de hitos y la prevención de duplicados se aplican en la aplicación, no como una restricción del programa Anchor en esta versión. La wallet con autoridad de actualización de la colección podría crear Assets directamente fuera del dashboard.
+- La venta y la recompensa Token-2022 (cuando aplica) se confirman juntas. La emisión Metaplex Core se ejecuta en una segunda transacción para que un error de NFT no revierta la venta.
+- El módulo de Reconocimientos consulta las ventas históricas y los Assets existentes, permite emitir pendientes uno a uno o en lote y vuelve a comprobar cada hito antes de emitir.
+- La regla de hitos y la prevención de duplicados se aplican mediante comprobaciones del frontend, no como una restricción del programa Anchor en esta versión. La wallet con autoridad de actualización de la colección podría crear Assets directamente fuera del dashboard.
 - Anchor registra la dirección de la colección y las URI, pero no valida internamente el estado Metaplex Core ni impone que un Asset corresponda a un hito elegible. Una garantía anti-fraude más estricta requeriría validaciones y recibos únicos adicionales en el programa.
 
 ## Probar la aplicación
@@ -120,8 +123,10 @@ La versión desplegada permite revisar el dashboard sin instalar el proyecto ni 
 1. Abre [MotoLedger en Vercel](https://moto-ledger-token-2022.vercel.app/).
 2. Selecciona **Solana Devnet** y conecta la wallet owner de un concesionario de demostración.
 3. Entra en **Reconocimientos NFT** para consultar la colección y los hitos configurados.
-4. Revisa las ventas del concesionario y el progreso de sus clientes.
-5. Consulta los NFT emitidos y abre sus direcciones en Solana Explorer.
+4. En **Reconocimientos NFT**, crea o registra la colección y sube las metadata de los tres hitos a Pinata para guardar sus URI en Solana.
+5. Revisa las ventas históricas y utiliza **Emitir todos los disponibles** para procesar los reconocimientos pendientes de clientes con wallet vinculada.
+6. Registra una nueva venta que complete un hito para comprobar la emisión automática. La venta se confirma primero; el NFT se procesa en una transacción independiente.
+7. Consulta los NFT emitidos y abre sus direcciones en Solana Explorer.
 
 Para crear ventas o emitir reconocimientos durante una prueba, la wallet owner necesita SOL de Devnet para las comisiones y la creación de cuentas.
 
