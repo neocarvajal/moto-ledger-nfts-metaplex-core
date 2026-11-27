@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { address, getBase64Encoder, getTransactionDecoder, getBase64EncodedWireTransaction } from "@solana/kit";
 import { useConnectedWallet, useConnect, useWallets } from "@solana/kit-plugin-wallet/react";
 import { useAppClient } from "../../lib/client-provider";
@@ -44,7 +45,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [signing, setSigning] = useState(false);
-  const [completionVerified, setCompletionVerified] = useState(false);
+  const [verifiedReceiptKey, setVerifiedReceiptKey] = useState<string | null>(null);
   const readyRequestedRef = useRef<string | null>(null);
 
   const loadSession = useCallback(async () => {
@@ -103,10 +104,13 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
   const signedMint = signedSession?.mint;
   const signedServicioId = signedSession?.servicioId;
   const signedPuntos = signedSession?.puntos;
+  const signedReceiptKey = signedSession
+    ? [signedSession.cliente, signedSession.idCanje, signedSession.walletAddress, signedSession.concesionario, signedSession.mint, signedSession.servicioId, signedSession.puntos].join(":")
+    : null;
+  const completionVerified = signedReceiptKey !== null && verifiedReceiptKey === signedReceiptKey;
 
   useEffect(() => {
     let active = true;
-    setCompletionVerified(false);
     if (!signedCliente || !signedIdCanje || !signedWalletAddress || !signedConcesionario || !signedMint || signedServicioId === undefined || !signedPuntos) return;
     const verifyReceipt = async () => {
       try {
@@ -122,7 +126,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
           data.idCanje === BigInt(signedIdCanje) &&
           data.servicioId === signedServicioId &&
           data.puntos === BigInt(signedPuntos)
-        ) setCompletionVerified(true);
+        ) setVerifiedReceiptKey(signedReceiptKey);
       } catch {
         // The receipt may not exist until the dealership submits the signed transaction.
       }
@@ -130,7 +134,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
     void verifyReceipt();
     const poll = window.setInterval(() => { void verifyReceipt(); }, 2000);
     return () => { active = false; window.clearInterval(poll); };
-  }, [client, signedCliente, signedIdCanje, signedWalletAddress, signedConcesionario, signedMint, signedServicioId, signedPuntos]);
+  }, [client, signedCliente, signedIdCanje, signedWalletAddress, signedConcesionario, signedMint, signedServicioId, signedPuntos, signedReceiptKey]);
 
   const sign = async () => {
     if (!session?.transaction || !connected?.signer || connected.account.address !== session.walletAddress || signing) return;
@@ -232,7 +236,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
         ) : !connected ? (
           <div className="mt-5 space-y-2">
             <p className="text-xs font-semibold text-[#424950]">Selecciona tu wallet para autorizar el canje</p>
-            {wallets.map((wallet) => <button key={wallet.name} type="button" disabled={connecting} onClick={() => { void connect(wallet).catch((cause) => { setError(cause instanceof Error ? cause.message : "No se pudo conectar la wallet."); }); }} className="flex w-full items-center gap-3 rounded-xl border border-[#e2e5e8] px-4 py-3 text-left text-xs font-semibold text-[#424950] hover:border-[#e60012] disabled:opacity-50">{wallet.icon && <img src={wallet.icon} alt="" className="h-6 w-6 rounded-md" />}{wallet.name}</button>)}
+            {wallets.map((wallet) => <button key={wallet.name} type="button" disabled={connecting} onClick={() => { void connect(wallet).catch((cause) => { setError(cause instanceof Error ? cause.message : "No se pudo conectar la wallet."); }); }} className="flex w-full items-center gap-3 rounded-xl border border-[#e2e5e8] px-4 py-3 text-left text-xs font-semibold text-[#424950] hover:border-[#e60012] disabled:opacity-50">{wallet.icon && <Image src={wallet.icon} alt="" width={24} height={24} unoptimized className="h-6 w-6 rounded-md" />}{wallet.name}</button>)}
           </div>
         ) : connected.account.address !== session.walletAddress ? (
           <p className="mt-5 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">Conecta la wallet vinculada a este cliente: {shortAddress(session.walletAddress)}.</p>
