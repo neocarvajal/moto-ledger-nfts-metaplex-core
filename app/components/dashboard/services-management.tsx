@@ -150,18 +150,20 @@ export function ServicesManagement({
   }, [client, concesionario]);
 
   useEffect(() => {
-    void loadData();
+    const timer = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadData]);
 
+  const selectedMotorcycleAddress = selectedMotorcycle?.address ?? "";
+
   useEffect(() => {
+    if (!selectedMotorcycleAddress) return;
     let active = true;
-    setLatestMileage(null);
-    setMileage("");
-    if (!selectedMotorcycle) return;
-    setMileageLoading(true);
     void (async () => {
       try {
-        const motoAddress = address(selectedMotorcycle.address);
+        const motoAddress = address(selectedMotorcycleAddress);
         const currentMileage = await fetchLatestMotorcycleMileage(
           client,
           motoAddress,
@@ -179,7 +181,7 @@ export function ServicesManagement({
       }
     })();
     return () => { active = false; };
-  }, [client, concesionario, selectedMotorcycle?.address]);
+  }, [client, concesionario, selectedMotorcycleAddress]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -291,7 +293,19 @@ export function ServicesManagement({
           <div className="space-y-4">
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Moto vendida</span>
-              <select value={selectedMoto} onChange={(event) => setSelectedMoto(event.target.value)} required disabled={soldMotorcycles.length === 0 || busy} className="w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]">
+              <select
+                value={selectedMoto}
+                onChange={(event) => {
+                  const nextMoto = event.target.value;
+                  setSelectedMoto(nextMoto);
+                  setLatestMileage(null);
+                  setMileage("");
+                  setMileageLoading(Boolean(nextMoto));
+                }}
+                required
+                disabled={soldMotorcycles.length === 0 || busy}
+                className="w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]"
+              >
                 {soldMotorcycles.length === 0 ? <option value="">No hay motos vendidas</option> : <><option value="">Selecciona una moto vendida</option>{soldMotorcycles.map((item) => <option key={item.address} value={item.address}>{item.data.marca} {item.data.modelo} · {item.data.serial}</option>)}</>}
               </select>
             </label>
