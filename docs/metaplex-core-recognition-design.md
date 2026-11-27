@@ -4,93 +4,124 @@
 
 Add collectible purchase-recognition NFTs to MotoLedger without changing or replacing the existing Token-2022 points and service-redemption flow.
 
-The NFT represents a confirmed purchase milestone. It is not a points reward and is never burned when a customer redeems a service.
+The NFT represents a confirmed motorcycle purchase milestone. It is not a points reward and is never burned when a customer redeems a service.
+
+## Bootcamp implementation pattern
+
+This implementation follows the Taller 3 guide and its prompt:
+
+- **The deployed Anchor program does not change.**
+- Codama remains the client for the existing `registrar_venta` instruction.
+- Metaplex Core and Umi build the collection and Asset instructions.
+- Umi instructions are converted to Solana Kit instructions with `@metaplex-foundation/umi-kit-adapters`.
+- The existing connected owner wallet signs and pays for the transaction; the generated Core collection/Asset keypair signs only the new account creation.
+- When a sale reaches a milestone and the customer has a linked wallet, the sale and Core Asset creation are submitted in the same Kit transaction.
+
+The current Anchor program, IDL and generated Codama client therefore require no update or redeployment for this frontend integration.
+
+## MotoLedger-specific purchase counting
+
+The bootcamp reference has a single business and can use the customer's purchase counter. MotoLedger supports multiple dealerships and a global `Cliente` account can be associated with more than one dealership.
+
+For that reason, `Cliente.total_motos_cliente` is **not** the recognition counter: it is global to the customer identity and does not represent purchases at the currently selected dealership.
+
+MotoLedger already stores each confirmed purchase in a `Venta` account with:
+
+- `concesionario`: dealership PDA.
+- `cliente`: global customer PDA.
+- `moto`: motorcycle PDA.
+- `fecha_venta` and `precio_venta`.
+
+The recognition module queries the `Venta` accounts for the selected dealership and counts only records whose `cliente` matches the customer. The sales module already uses the dealership filter when loading its sales history. A motorcycle can be sold only once because `Venta` is initialized at the motorcycle-derived PDA; the current program has no sale-refund/decrement instruction.
+
+This gives the intended progress scope:
+
+    (concesionario PDA, cliente PDA) -> confirmed Venta count
+
+It avoids changing the existing `Cliente` account layout or adding a global counter that would mix dealerships.
 
 ## Product rules
 
-- Recognition progress is calculated independently for each dealership and customer pair.
+- Recognition progress is calculated independently for each dealership/customer pair.
 - Milestones are cumulative: 1, 3 and 5 confirmed purchases.
-- Each milestone can be issued only once for a given dealership/customer pair.
+- Each milestone is checked against the selected dealership's Core collection before issuing.
 - Earlier NFTs remain in the customer's wallet after reaching a later milestone.
-- Only a confirmed on-chain sale advances progress.
-- The customer must have a wallet linked to their MotoLedger customer record before an NFT can be issued.
-- The dealership owner pays the minting and transaction costs; the linked customer wallet is the NFT owner.
-- Each dealership owns its own Metaplex Core collection.
-- NFT metadata must not contain customer PII (name, national ID, email or phone).
+- Only confirmed on-chain `Venta` records advance progress.
+- The customer must have a `WalletCliente` account before automatic or manual NFT issuance.
+- The linked customer wallet owns the NFT.
+- The dealership owner pays transaction fees and Core account rent and is the collection update authority.
+- Each dealership has its own Metaplex Core collection.
+- NFT Attributes contain only on-chain account addresses and milestone data; customer name, national ID, email, phone and motorcycle VIN are not written into public NFT metadata.
 
-## On-chain design
+## Wallet and pending-recognition behavior
 
-### Purchase progress PDA
+MotoLedger already has a customer-to-wallet link stored in the `WalletCliente` PDA derived from the customer PDA.
 
-Introduce a ProgresoReconocimiento account derived from:
-
-    ["progreso_reconocimiento", concesionario, cliente]
-
-Suggested fields:
-
-- owner: dealership owner authority.
-- concesionario: dealership public key.
-- cliente: global customer PDA.
-- compras_confirmadas: purchase count for this dealership/customer pair.
-- bump: PDA bump.
-
-The registrar_venta instruction increments this account in the same transaction that marks the motorcycle as sold and creates the Venta account. This makes the counter reflect confirmed sales, not browser state or a separately indexed history.
-
-### Issued-recognition PDA
-
-Introduce a ReconocimientoEmitido account derived from:
-
-    ["reconocimiento_emitido", concesionario, cliente, hito]
-
-The milestone identifier is restricted to 1, 3 or 5. The account records the dealership, customer, milestone, Core asset address and issuance timestamp.
-
-The recognition instruction validates the dealership authority, customer association, linked customer wallet and sufficient purchase count. Initializing the milestone PDA makes duplicate issuance impossible for the same customer, dealership and milestone.
-
-### Atomic NFT issuance
-
-The client prepares a single transaction containing:
-
-1. The Anchor instruction that initializes the milestone receipt and validates eligibility.
-2. The Metaplex Core instruction that creates the NFT in the dealership collection, owned by the linked customer wallet and paid by the dealership owner.
-
-Both instructions must be in the same transaction. If Core asset creation fails, the receipt initialization rolls back too; if the milestone PDA already exists, the transaction is rejected before a duplicate can be created.
-
-The Core asset address must be known when preparing the receipt instruction. The frontend generates the asset keypair/address before composing the transaction.
+- If the customer has a linked wallet and the sale reaches 1, 3 or 5 purchases, the NFT is included automatically in the sale transaction when a collection is configured.
+- If no collection is configured or the customer has not linked a wallet, the sale still works normally. The eligible milestone appears under **Reconocimientos NFT → Pendientes**.
+- After the customer links a wallet, the dealership owner can issue the pending recognition without changing the historical sale.
+- For a pending recognition, the Asset Attributes reference the `Venta` that originally reached that milestone (the 1st, 3rd or 5th sale), not an arbitrary later sale.
 
 ## Metaplex Core configuration
 
 - Standard: Metaplex Core.
 - Collection: one collection per dealership.
-- Collection update authority: dealership owner.
-- NFT owner: customer's linked wallet.
-- Payer: dealership owner.
-- Storage: Pinata/IPFS metadata and image URLs using the configured public gateway.
-- Transfer policy: start with the workshop's PermanentFreezeDelegate and frozen=true approach. This is a reversible freeze controlled by the delegate; it should not be described as an irreversible Soulbound guarantee.
+- Collection update authority: dealership owner wallet.
+- NFT owner: customer's linked `WalletCliente.wallet`.
+- Payer: dealership owner wallet.
+- Metadata: public HTTPS JSON URI, expected to be hosted on Pinata/IPFS using the configured public gateway.
+- Asset plugins: `Attributes` and `PermanentFreezeDelegate` with `frozen: true`, following the bootcamp example.
 
-Metadata should describe the milestone and dealership brand, without customer identity fields. Suggested public attributes include Milestone, Purchases, Dealership and Network.
+Each Asset stores these Attributes as strings:
+
+- `hito`: 1, 3 or 5.
+- `cliente`: customer PDA.
+- `concesionario`: dealership PDA.
+- `venta`: milestone sale PDA.
+
+The metadata JSON should describe the recognition and dealership brand. It must not contain customer identity information.
 
 ## Dashboard experience
 
-Add a dedicated Reconocimientos NFT module, separate from Fidelización:
+The **Reconocimientos NFT** module is separate from **Fidelización**:
 
-- Collection status and collection address for the selected dealership.
-- Customer list with confirmed purchase count and next eligible milestone.
-- Wallet-link status and eligibility explanation.
-- Mint action for an eligible milestone.
-- Issued NFT history with Core asset address, milestone, date and Explorer link.
-- Customer detail should show NFT recognitions separately from Token-2022 balance and service-redemption history.
+- Create a collection for the selected dealership or restore its address.
+- Configure the public Pinata/IPFS metadata URI.
+- View each customer's dealership-specific purchase count.
+- View pending milestones and whether the customer's wallet is linked.
+- Issue pending recognitions and show the approximate SOL cost.
+- List issued Core Assets with owner and Explorer links.
 
-If a customer reaches a milestone before linking a wallet, keep the milestone pending. Once the wallet is linked, the owner can issue the recognition without changing the historical sale.
+Collection configuration is stored in browser `localStorage`, scoped by cluster, owner wallet and dealership. If the owner changes browser or clears local storage, the collection can be restored by entering its address and metadata URI.
 
-## Implementation sequence
+## Atomicity
 
-1. Add dealership/customer purchase progress and milestone receipt accounts to the Anchor program.
-2. Update the Anchor IDL and regenerate the Codama client.
-3. Add Metaplex Core collection creation and asset minting helpers.
-4. Add the dashboard module and customer recognition history.
-5. Add tests for per-dealership counting, 1/3/5 thresholds, duplicate prevention, missing wallet links and atomic rollback.
-6. Document Devnet setup, Pinata configuration and the end-to-end test flow.
+When a sale reaches a milestone:
 
-## Current status
+1. The client builds the existing Codama `registrar_venta` instruction.
+2. It reads the dealership/customer sale count and checks the collection for an existing recognition.
+3. It builds the Metaplex Core `create` instruction with the linked customer wallet as owner and the dealership owner as payer/authority.
+4. If Token-2022 rewards also apply, the existing ATA creation and `otorgar_puntos` instructions remain in the same transaction.
+5. The app sends the combined instruction list with `client.sendTransaction`.
 
-This document captures the implementation contract and product decisions. It does not mean the Anchor program has been updated or deployed yet. The existing Token-2022 flow remains unchanged.
+If the sale, points reward or Core Asset instruction fails, the transaction is atomic and none of its state changes are committed. A pending recognition is issued in its own transaction because its sale has already been confirmed.
+
+## Security and scope limitations
+
+This is the bootcamp's **frontend-controlled recognition pattern**, not an on-chain milestone authorization system:
+
+- The Anchor program does not validate the 1/3/5 milestone and does not store a unique recognition receipt PDA.
+- Duplicate prevention is performed by reading the Core collection Attributes before the app issues an Asset. It is not a program-level uniqueness constraint.
+- The collection update authority is the dealership owner. That authority can create an Asset in its collection outside the dashboard; a user with that authority could bypass the app's milestone checks.
+- The app's local collection configuration is not an on-chain registry.
+- Public RPC account scans can be rate-limited. A dedicated RPC/indexer may be needed as a dealership's sale history grows.
+
+A future production-hardening iteration could add Anchor progress and issuance-receipt PDAs, but that is intentionally outside this bootcamp-aligned implementation and would require a new program build, IDL and Codama client.
+
+## Implementation status
+
+- Anchor program: unchanged.
+- Program ID and deployed address: unchanged.
+- IDL and Codama-generated client: unchanged.
+- Token-2022 rewards and service redemption: unchanged.
+- New work: Metaplex Core/Umi helpers, a dealership-level Reconocimientos NFT module and atomic NFT issuance from the sales flow.
