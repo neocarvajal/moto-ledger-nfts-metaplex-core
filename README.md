@@ -41,9 +41,70 @@ El dashboard comienza en **Configuración**, que concentra el registro y la sele
 3. **Clientes:** registrar o precargar clientes y administrar sus asociaciones con el concesionario.
 4. **Ventas:** registrar las ventas utilizando motos disponibles y clientes registrados.
 5. **Fidelización:** configurar el programa Token-2022, consultar recompensas y gestionar canjes.
-6. **Servicios:** administrar el catálogo y los trabajos de posventa.
+6. **Reconocimientos NFT:** administrar la colección Metaplex Core y los certificados por hitos de compras.
+7. **Servicios:** administrar el catálogo y los trabajos de posventa.
 
 El registro de concesionarios solo se realiza desde **Configuración**. Los demás módulos conservan el selector del concesionario; si la wallet conectada no tiene uno registrado, muestran un acceso a Configuración en lugar de repetir el formulario. Si la garantía todavía no está configurada, el estado on-chain lo indica y ofrece ir directamente a su configuración antes de registrar motos.
+
+## Reconocimientos NFT con Metaplex Core
+
+MotoLedger incorpora un módulo **Reconocimientos NFT** independiente de **Fidelización Token-2022**. Los NFT son certificados por compras confirmadas: el cliente recibe un reconocimiento al alcanzar 1, 3 y 5 ventas en un mismo concesionario. No son puntos, no se canjean por servicios y no se queman al realizar un canje.
+
+### Cómo se calcula el progreso
+
+El contador `Cliente.total_motos_cliente` es global para la identidad del cliente y no se utiliza para los hitos. MotoLedger permite asociar un mismo cliente a varios concesionarios, así que el progreso se calcula consultando las cuentas `Venta` que coinciden con la PDA del concesionario seleccionado y la PDA del cliente. Cada concesionario mantiene su propio progreso y su propia colección.
+
+### Configurar la colección
+
+1. Conecta la wallet owner y selecciona el concesionario.
+2. Abre **Reconocimientos NFT**.
+3. Prepara un JSON público de metadata en Pinata/IPFS. Ejemplo mínimo:
+
+   ```json
+   {
+     "name": "Reconocimiento MotoLedger",
+     "description": "Certificado por alcanzar un hito de compras en el concesionario.",
+     "image": "https://<gateway-publico>/ipfs/<CID-DE-IMAGEN>"
+   }
+   ```
+
+4. Copia la URL HTTPS pública del JSON (por ejemplo, `https://<gateway-publico>/ipfs/<CID-DE-METADATA>`) y pulsa **Crear colección**.
+5. Aprueba la transacción con la wallet owner. La colección queda bajo la autoridad de esa wallet y los NFT serán pagados por el owner.
+
+Se crea una colección por concesionario. La dirección y la URL se guardan en el navegador, asociadas al cluster, wallet owner y concesionario. Si cambias de navegador o limpias el almacenamiento, utiliza **Vincular colección existente** e introduce la dirección de la colección y su URI de metadata.
+
+Para el almacenamiento IPFS se utiliza Pinata. El proyecto ya contempla las variables `PINATA_JWT` y `NEXT_PUBLIC_GATEWAY_URL` para sus flujos de metadata; la URI que se introduce en Reconocimientos debe ser una URL HTTPS pública que devuelva el JSON, no una página HTML de GitHub ni una URI `ipfs://`.
+
+### Flujo de emisión
+
+- **Venta con wallet vinculada:** si la colección está configurada y la venta alcanza exactamente el siguiente hito (1, 3 o 5), la aplicación añade la instrucción Metaplex Core a la misma transacción que registra la venta. Si también corresponde emitir puntos Token-2022, las instrucciones de venta, puntos y NFT se envían juntas.
+- **Venta sin wallet vinculada o sin colección:** la venta se registra normalmente. El hito aparece como pendiente y puede emitirse después.
+- **Pendientes:** abre **Reconocimientos NFT**, revisa el hito alcanzado y emite cuando el cliente tenga su wallet vinculada en el módulo **Clientes**. La interfaz muestra el costo aproximado en SOL.
+- **Emitidos:** el historial muestra el hito, el cliente, el owner del Asset y el enlace a Explorer.
+
+El cliente debe tener su wallet vinculada mediante la cuenta on-chain `WalletCliente`; no se introduce una wallet manual en cada venta. El owner del concesionario paga la renta del Asset y el owner del NFT es la wallet vinculada del cliente.
+
+Los Attributes on-chain del Asset enlazan `hito`, `cliente` (PDA), `concesionario` (PDA) y `venta` (PDA). No se publica nombre, cédula, teléfono, correo ni serial VIN del comprador.
+
+### Dependencias y ejecución local
+
+Las dependencias Metaplex Core/Umi y el adaptador Umi-Kit se incluyen en `package.json`. Después de actualizar el repositorio, ejecuta:
+
+```bash
+npm install
+npm run typecheck
+npm run build
+```
+
+### Alcance y limitaciones
+
+Esta integración sigue el patrón frontend del Taller 3: **no modifica el programa Anchor, el IDL ni el cliente Codama**, por lo que no requiere volver a desplegar el programa. Las instrucciones Core se convierten a instrucciones de Solana Kit y se combinan con la instrucción Codama de venta.
+
+La atomicidad garantiza que, cuando la aplicación añade el NFT a una venta, ambas operaciones se confirman o revierten juntas. Sin embargo, el programa Anchor no valida los hitos ni guarda una PDA de emisión única: la comprobación de duplicados se hace leyendo los Attributes de la colección desde la aplicación. La wallet owner que controla la colección podría crear Assets por fuera del dashboard y saltarse esas comprobaciones. Este es el alcance del taller; una futura validación anti-fraude on-chain requeriría modificar Anchor, regenerar IDL/Codama y desplegar una nueva versión.
+
+Diseño y decisiones técnicas: [docs/metaplex-core-recognition-design.md](docs/metaplex-core-recognition-design.md).
+
+---
 
 ## Preparar datos de demostración
 
