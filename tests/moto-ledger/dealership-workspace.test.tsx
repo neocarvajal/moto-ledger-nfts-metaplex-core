@@ -85,12 +85,17 @@ vi.mock("../../app/lib/moto-ledger/pdas", () => ({
   deriveConcesionarioPda: mocks.deriveDealership,
 }));
 
-vi.mock("../../app/lib/moto-ledger/generated/src/generated/accounts/concesionario", () => ({
+vi.mock("../../app/lib/moto-ledger/src/generated/accounts/concesionario", () => ({
   getConcesionarioDecoder: () => ({ decode: mocks.decode }),
   getConcesionarioDiscriminatorBytes: () => new Uint8Array(8),
 }));
 
-vi.mock("../../app/lib/moto-ledger/generated/src/generated/programs", () => ({
+vi.mock("../../app/lib/moto-ledger/src/generated/accounts/asociacionCliente", () => ({
+  getAsociacionClienteDecoder: () => ({ decode: () => ({ activo: true }) }),
+  getAsociacionClienteDiscriminatorBytes: () => new Uint8Array(8),
+}));
+
+vi.mock("../../app/lib/moto-ledger/src/generated/programs", () => ({
   REGISTRO_PROGRAM_ADDRESS: "MotoLedgerProgram111111111111111111111111111",
 }));
 
@@ -135,6 +140,9 @@ describe("MotoLedger dealership workspace", () => {
     mocks.client.rpc.getProgramAccounts.mockReturnValue({
       send: vi.fn().mockResolvedValue([]),
     });
+    mocks.client.registro.accounts.concesionario.fetch.mockImplementation(async (selectedAddress: string) => ({
+      data: selectedAddress === "dealership-b" ? mocks.dealershipB : mocks.dealershipA,
+    }));
   });
 
   it("asks for a wallet before showing dealership operations", () => {
@@ -189,8 +197,8 @@ describe("MotoLedger dealership workspace", () => {
       context: { signature: "signature-123" },
     });
 
-    render(<DealershipWorkspace activeModule="workspace" onNavigate={() => {}} />);
-    fireEvent.change(screen.getByLabelText("Nombre del concesionario"), {
+    render(<DealershipWorkspace activeModule="settings" onNavigate={() => {}} />);
+    fireEvent.change(await screen.findByLabelText("Nombre del concesionario"), {
       target: { value: "NUEVO MOTOR" },
     });
     fireEvent.change(screen.getByLabelText("RIF del concesionario"), {
@@ -227,8 +235,8 @@ describe("MotoLedger dealership workspace", () => {
       data: mocks.dealershipA,
     });
 
-    render(<DealershipWorkspace activeModule="workspace" onNavigate={() => {}} />);
-    fireEvent.change(screen.getByLabelText("Nombre del concesionario"), {
+    render(<DealershipWorkspace activeModule="settings" onNavigate={() => {}} />);
+    fireEvent.change(await screen.findByLabelText("Nombre del concesionario"), {
       target: { value: "BERA MOTORS" },
     });
     fireEvent.change(screen.getByLabelText("RIF del concesionario"), {
@@ -246,8 +254,8 @@ describe("MotoLedger dealership workspace", () => {
 
   it("rejects registration when the wallet cannot sign", async () => {
     mocks.activeWallet = { account: mocks.connected.account, signer: undefined } as never;
-    render(<DealershipWorkspace activeModule="workspace" onNavigate={() => {}} />);
-    fireEvent.change(screen.getByLabelText("Nombre del concesionario"), {
+    render(<DealershipWorkspace activeModule="settings" onNavigate={() => {}} />);
+    fireEvent.change(await screen.findByLabelText("Nombre del concesionario"), {
       target: { value: "NUEVO MOTOR" },
     });
     fireEvent.change(screen.getByLabelText("RIF del concesionario"), {
