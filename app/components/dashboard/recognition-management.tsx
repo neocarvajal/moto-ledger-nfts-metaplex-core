@@ -250,7 +250,10 @@ export function RecognitionManagement({
   }, [client, cluster, concesionario, loadCollectionConfig, owner]);
 
   useEffect(() => {
-    void loadData();
+    const timer = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadData]);
 
   const pending = useMemo(() => {
