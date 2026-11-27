@@ -47,6 +47,63 @@ pub mod registro {
         Ok(())
     }
 
+    /// Registers the already-created Metaplex Core collection for this dealership.
+    /// Collection creation is performed by the frontend; this PDA makes its association persistent on-chain.
+    pub fn registrar_coleccion_reconocimientos(
+        context: Context<RegistrarColeccionReconocimientos>,
+        collection_metadata_uri: String,
+    ) -> Result<()> {
+        require!(
+            !collection_metadata_uri.is_empty()
+                && collection_metadata_uri.len() <= ReconocimientoColeccion::MAX_URI_LEN
+                && collection_metadata_uri.starts_with("https://"),
+            Errores::MetadataUriInvalida
+        );
+        require!(
+            context.accounts.collection.lamports() > 0,
+            Errores::ColeccionInvalida
+        );
+
+        context.accounts.reconocimiento_coleccion.set_inner(ReconocimientoColeccion {
+            owner: context.accounts.owner.key(),
+            concesionario: context.accounts.concesionario.key(),
+            collection: context.accounts.collection.key(),
+            collection_metadata_uri,
+            hito_1_metadata_uri: String::new(),
+            hito_3_metadata_uri: String::new(),
+            hito_5_metadata_uri: String::new(),
+            bump: context.bumps.reconocimiento_coleccion,
+        });
+
+        msg!("Coleccion de reconocimientos registrada on-chain: {}", context.accounts.collection.key());
+        Ok(())
+    }
+
+    /// Updates the three milestone metadata URIs without changing the registered collection.
+    pub fn actualizar_metadata_reconocimientos(
+        context: Context<ActualizarMetadataReconocimientos>,
+        hito_1_metadata_uri: String,
+        hito_3_metadata_uri: String,
+        hito_5_metadata_uri: String,
+    ) -> Result<()> {
+        for uri in [&hito_1_metadata_uri, &hito_3_metadata_uri, &hito_5_metadata_uri] {
+            require!(
+                uri.is_empty()
+                    || (uri.len() <= ReconocimientoColeccion::MAX_URI_LEN
+                        && uri.starts_with("https://")),
+                Errores::MetadataUriInvalida
+            );
+        }
+
+        let config = &mut context.accounts.reconocimiento_coleccion;
+        config.hito_1_metadata_uri = hito_1_metadata_uri;
+        config.hito_3_metadata_uri = hito_3_metadata_uri;
+        config.hito_5_metadata_uri = hito_5_metadata_uri;
+
+        msg!("Metadata de hitos actualizada on-chain para la coleccion {}", config.collection);
+        Ok(())
+    }
+
    pub fn configurar_garantia(
         context: Context<ConfigurarGarantia>,
         nombre_concesionario: String,
@@ -1449,6 +1506,10 @@ pub struct CanjearServicio<'info> {
 
 #[error_code]
 pub enum Errores {
+    #[msg("La URI de metadata debe ser HTTPS y no superar 200 bytes")]
+    MetadataUriInvalida,
+    #[msg("La coleccion de reconocimientos no es valida")]
+    ColeccionInvalida,
     #[msg("Error, el serial N.I.V debe tener una longitud de 17 caracteres")]
     NivInvalido,
     #[msg("Error, la placa debe tener una longitud de 7 caracteres")]
@@ -1657,6 +1718,29 @@ impl Concesionario {
         8 +        // total_ventas: u64,
         2 +        // duracion_garantia_dias: u16
         8;         // kilometraje_maximo: u64
+}
+
+/// On-chain source of truth for the Metaplex Core recognition collection and its metadata.
+#[account]
+#[derive(InitSpace)]
+pub struct ReconocimientoColeccion {
+    pub owner: Pubkey,
+    pub concesionario: Pubkey,
+    pub collection: Pubkey,
+    #[max_len(200)]
+    pub collection_metadata_uri: String,
+    #[max_len(200)]
+    pub hito_1_metadata_uri: String,
+    #[max_len(200)]
+    pub hito_3_metadata_uri: String,
+    #[max_len(200)]
+    pub hito_5_metadata_uri: String,
+    pub bump: u8,
+}
+
+impl ReconocimientoColeccion {
+    pub const MAX_URI_LEN: usize = 200;
+    pub const LEN: usize = DISCRIMINATOR + Self::INIT_SPACE;
 }
 
 #[account]
@@ -1868,6 +1952,55 @@ impl Reclamacion {
         8         + // kilometraje: u64
         (4 + 100) + // descripcion
         1;          // estado: EstadoReclamacion
+}
+
+#[derive(Accounts)]
+pub struct RegistrarColeccionReconocimientos<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
+    #[account(
+        seeds = [b"concesionario", concesionario.nombre_concesionario.as_bytes(), owner.key().as_ref()],
+        bump,
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized
+    )]
+    pub concesionario: Account<'info, Concesionario>,
+
+    /// CHECK: The frontend verifies that this address is a Metaplex Core collection before registration.
+    /// The program stores the address; it does not deserialize or mutate the Core account.
+    pub collection: UncheckedAccount<'info>,
+
+    #[account(
+        init,
+        payer = owner,
+        space = ReconocimientoColeccion::LEN,
+        seeds = [b"reconocimiento_coleccion", concesionario.key().as_ref()],
+        bump
+    )]
+    pub reconocimiento_coleccion: Account<'info, ReconocimientoColeccion>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ActualizarMetadataReconocimientos<'info> {
+    pub owner: Signer<'info>,
+
+    #[account(
+        seeds = [b"concesionario", concesionario.nombre_concesionario.as_bytes(), owner.key().as_ref()],
+        bump,
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized
+    )]
+    pub concesionario: Account<'info, Concesionario>,
+
+    #[account(
+        mut,
+        seeds = [b"reconocimiento_coleccion", concesionario.key().as_ref()],
+        bump = reconocimiento_coleccion.bump,
+        constraint = reconocimiento_coleccion.owner == owner.key() @ Errores::Unauthorized,
+        constraint = reconocimiento_coleccion.concesionario == concesionario.key() @ Errores::ColeccionInvalida
+    )]
+    pub reconocimiento_coleccion: Account<'info, ReconocimientoColeccion>,
 }
 
 #[derive(Accounts)]
