@@ -117,7 +117,7 @@ export function RecognitionManagement({
   }, []);
 
   const loadCollectionConfig = useCallback(async () => {
-    if (!concesionario) {
+    if (!concesionario || !owner) {
       setConfig(null);
       setCollectionPda("");
       return null;
@@ -132,12 +132,12 @@ export function RecognitionManagement({
       return null;
     }
     const account = await fetchReconocimientoColeccion(client.rpc, pda);
-    if (account.data.concesionario !== concesionario) {
-      throw new Error("La PDA de reconocimientos no corresponde al concesionario seleccionado.");
+    if (account.data.concesionario !== concesionario || account.data.owner !== owner) {
+      throw new Error("La configuración NFT on-chain no corresponde al owner y concesionario seleccionados.");
     }
     applyOnChainConfig(account.data);
     return account.data;
-  }, [applyOnChainConfig, client, concesionario]);
+  }, [applyOnChainConfig, client, concesionario, owner]);
 
   useEffect(() => {
     setError("");
