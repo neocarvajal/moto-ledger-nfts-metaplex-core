@@ -49,7 +49,7 @@ export function RecognitionMilestoneUploader({
       "cluster:" + network,
       "timestamp:" + timestamp,
       "nonce:" + nonce,
-    ].join("\\n");
+    ].join("\n");
     const signature = await client.wallet.signMessage(new TextEncoder().encode(message));
     const body = new FormData();
     body.set("image", file);
