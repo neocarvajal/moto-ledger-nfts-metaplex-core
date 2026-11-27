@@ -39,7 +39,7 @@ export type RecognitionConfig = {
   collection: string;
   collectionMetadata?: RecognitionMetadata;
   milestones?: Partial<Record<RecognitionMilestone, RecognitionMetadata>>;
-  /** Legacy collection metadata URI; retained for old local configurations. */
+  /** Mirror of the collection metadata URI stored in ReconocimientoColeccion. */
   metadataUri: string;
 };
 
