@@ -36,7 +36,7 @@ La cuenta Anchor `ReconocimientoColeccion` es la fuente de verdad para cada conc
 - **PDA:** semillas `[b"reconocimiento_coleccion", concesionario_pubkey]`.
 - **Campos:** owner, PDA del concesionario, dirección de la colección Core, URI de metadata de la colección, URI de metadata para hitos 1/3/5 y bump.
 - **Registro:** `registrar_coleccion_reconocimientos` crea la PDA una sola vez y asocia la colección existente al concesionario. La colección se crea primero con Metaplex Core desde el frontend; la wallet owner firma después el registro Anchor.
-- **Actualización:** `actualizar_metadata_reconocimientos` modifica las URI de los hitos sin permitir reemplazar la dirección de colección registrada.
+- **Actualización:** `actualizar_metadata_reconocimientos` actualiza la URI de metadata de la colección y las URI de los hitos sin permitir reemplazar la dirección de colección registrada.
 - **Permisos:** ambas instrucciones requieren la wallet owner del concesionario. No se modifica el layout de la cuenta `Concesionario`, por lo que no hace falta migrar las cuentas existentes.
 - **Validación de Core:** Anchor guarda la dirección y comprueba que la cuenta exista; el frontend debe verificar que la dirección corresponde a una colección Metaplex Core antes de registrarla. Anchor no deserializa el estado interno de Core en esta versión.
 
@@ -69,7 +69,7 @@ Estas son las imágenes JPG incluidas en el repositorio y utilizadas como muestr
   </tr>
 </table>
 
-Las tres imágenes JPG incluidas en el repositorio se cargan por defecto desde `assets/recognitions/milestone-1.jpg`, `assets/recognitions/milestone-3.jpg` y `assets/recognitions/milestone-5.jpg`. No necesitas seleccionarlas manualmente; el selector permite reemplazar cualquiera por otra imagen JPG. Pulsa **Subir los tres hitos** para cargar las pendientes en una sola operación, o sube cada una por separado. Cada carga crea su propio archivo de imagen y JSON público en Pinata. Las URI de los hitos se escriben en la PDA `ReconocimientoColeccion` mediante `actualizar_metadata_reconocimientos`; reemplazar una imagen actualiza su URI on-chain. La wallet owner debe firmar cada actualización. La wallet owner autoriza cada carga mediante firma de mensaje; `PINATA_JWT` permanece exclusivamente en el servidor.
+Las tres imágenes JPG incluidas en el repositorio se cargan por defecto desde `assets/recognitions/milestone-1.jpg`, `assets/recognitions/milestone-3.jpg` y `assets/recognitions/milestone-5.jpg`. No necesitas seleccionarlas manualmente; el selector permite reemplazar cualquiera por otra imagen JPG. Pulsa **Subir los tres hitos** para cargar las pendientes en una sola operación, o sube cada una por separado. Cada carga crea su propio archivo de imagen y JSON público en Pinata. La URI de metadata de la colección y las URI de los hitos se escriben en la PDA `ReconocimientoColeccion` mediante `actualizar_metadata_reconocimientos`; reemplazar una imagen o metadata actualiza su URI on-chain. La wallet owner debe firmar cada actualización. La wallet owner autoriza cada carga mediante firma de mensaje; `PINATA_JWT` permanece exclusivamente en el servidor.
 
 El JSON incluye `name`, `symbol`, `description`, `image`, `properties.files` y atributos de plataforma/hito. Los datos de cliente, venta y concesionario no se incorporan a la metadata pública: los atributos específicos de la emisión se guardan en el Asset Metaplex Core.
 
