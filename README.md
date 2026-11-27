@@ -1,6 +1,6 @@
-# MotoLedger
+# MotoLedger — Reconocimientos NFT con Metaplex Core
 
-**Gestión de concesionarios, trazabilidad de motocicletas y fidelización con Solana y Token-2022.**
+**Registro de ventas y fidelización por compras mediante colecciones y Assets NFT de Metaplex Core en Solana Devnet.** Token-2022 complementa la experiencia con puntos y canjes, pero el foco de esta entrega es la emisión de reconocimientos NFT por hitos.
 
 <p align="center">
   <img src="assets/moto-ledger-preview-.gif" alt="Dashboard de MotoLedger" width="100%">
@@ -9,42 +9,6 @@
 > **Red:** Solana Devnet  
 > **Programa:** `64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj`  
 > **Aplicación:** [moto-ledger-token-2022.vercel.app](https://moto-ledger-token-2022.vercel.app/)
-
-## Prueba rápida en la aplicación desplegada (recomendada)
-
-Para evaluar el proyecto **no necesitas clonar el repositorio ni configurar Node.js, Redis/Upstash o variables de entorno**. La aplicación ya está desplegada y esos servicios están configurados en el entorno de Vercel.
-
-1. Abre **[MotoLedger – aplicación en vivo](https://moto-ledger-token-2022.vercel.app/)**.
-2. Asegúrate de utilizar **Solana Devnet** en tu wallet y en la aplicación.
-3. Conecta la wallet owner de un concesionario de prueba. Para probar como comprador, utiliza una segunda wallet distinta.
-4. Sigue el [flujo de prueba de extremo a extremo](#flujo-de-prueba-de-extremo-a-extremo) descrito abajo.
-
-**Qué necesitas:** un navegador compatible con una wallet Solana (por ejemplo, Solflare o Phantom), dos wallets (owner y comprador), y SOL de Devnet para las transacciones que deban pagar comisiones. Es recomendable tener el dashboard abierto en un equipo y utilizar el teléfono para abrir los QR como comprador. No compartas claves privadas ni frases semilla.
-
-> [!IMPORTANT]
-> **Las wallets owner y comprador tienen funciones distintas.** El dashboard carga los concesionarios registrados por la wallet conectada. Para explorar y administrar el concesionario de demostración, conecta la **misma wallet owner** con la que fue creado. Si conectas una wallet nueva que no haya registrado concesionarios, verás **“No encontramos concesionarios para esta wallet”**. Esto es esperado: los datos siguen en Devnet, pero esa wallet no es la autoridad de esos concesionarios.
->
-> | Wallet | Dónde se utiliza | Qué hace |
-> | --- | --- | --- |
-> | **Owner** | Dashboard de MotoLedger | Administra el concesionario, registra ventas y genera los QR. Debe permanecer conectada durante el proceso. |
-> | **Comprador** | Ventana, pestaña o dispositivo aparte al abrir el QR | Conecta su wallet para firmar la vinculación y el canje. No necesita concesionarios ni registros propios en el dashboard. |
->
-> **No necesitas desconectar la wallet owner para utilizar la wallet del comprador.** Al generar un QR desde el dashboard, abre su enlace en el móvil o en otra ventana/pestaña del navegador y conecta allí la wallet del comprador. La sesión del dashboard permanece abierta con el owner conectado.
-
-
-## Organización del dashboard
-
-El dashboard comienza en **Configuración**, que concentra el registro y la selección de concesionarios, junto con la política de garantía de cada uno. Una vez preparado el concesionario, el trabajo operativo se distribuye en este orden:
-
-1. **Configuración:** registrar o seleccionar el concesionario y establecer la duración y el kilometraje máximo de garantía.
-2. **Inventario:** registrar motos o precargar el catálogo de demostración.
-3. **Clientes:** registrar o precargar clientes y administrar sus asociaciones con el concesionario.
-4. **Ventas:** registrar las ventas utilizando motos disponibles y clientes registrados.
-5. **Fidelización:** configurar el programa Token-2022, consultar recompensas y gestionar canjes.
-6. **Reconocimientos NFT:** administrar la colección Metaplex Core y los certificados por hitos de compras.
-7. **Servicios:** administrar el catálogo y los trabajos de posventa.
-
-El registro de concesionarios solo se realiza desde **Configuración**. Los demás módulos conservan el selector del concesionario; si la wallet conectada no tiene uno registrado, muestran un acceso a Configuración en lugar de repetir el formulario. Si la garantía todavía no está configurada, el estado on-chain lo indica y ofrece ir directamente a su configuración antes de registrar motos.
 
 ## Reconocimientos NFT con Metaplex Core
 
@@ -118,15 +82,79 @@ npm run typecheck
 npm run build
 ```
 
+### Qué queda on-chain y qué valida cada capa
+
+| Capa | Datos y responsabilidades |
+| --- | --- |
+| **Registro Anchor** | Mantiene las cuentas `Venta` con las direcciones de concesionario, cliente y moto, fecha y precio. En `registrar_venta` valida el contexto de la venta, la asociación activa del cliente, la moto disponible y registra la venta. No crea ni valida NFT, hitos o duplicados de Core. |
+| **Metaplex Core Collection** | Guarda la colección del concesionario, su nombre, URI de metadata y update authority. Hay una colección por concesionario. |
+| **Metaplex Core Asset** | Cada reconocimiento es un Asset con owner = wallet vinculada del cliente, nombre, URI y plugins. El plugin `Attributes` guarda `hito`, PDA de `cliente`, PDA de `concesionario` y PDA de `venta` que alcanzó ese hito. |
+| **Metadata IPFS** | El JSON público y la imagen viven fuera de la cadena en Pinata/IPFS. Se usa una URI independiente por hito; los atributos relacionales se guardan en el Asset, no en el JSON público. |
+| **Aplicación** | Cuenta las ventas del par concesionario/cliente, comprueba si corresponde 1, 3 o 5, consulta la colección para evitar duplicados, prepara las instrucciones Core y coordina la transacción. |
+
+**Autoridad de congelamiento:** el Asset se crea con `PermanentFreezeDelegate`, `frozen: true` y autoridad `UpdateAuthority`. Esa autoridad corresponde a la wallet owner del concesionario, que también es update authority de la colección. El cliente conserva la propiedad (owner) del Asset, pero no la autoridad de congelamiento. No debe describirse como una validación de hitos hecha por Anchor.
+
 ### Alcance y limitaciones
 
-Esta integración sigue el patrón frontend del Taller 3: **no modifica el programa Anchor, el IDL ni el cliente Codama**, por lo que no requiere volver a desplegar el programa. Las instrucciones Core se convierten a instrucciones de Solana Kit y se combinan con la instrucción Codama de venta.
+La integración es frontend y reutiliza el programa Anchor, su IDL y el cliente Codama existentes: **no requiere un nuevo despliegue del programa**. Las instrucciones Metaplex Core/Umi se convierten a instrucciones de Solana Kit y se combinan con la instrucción Codama de venta.
 
-La atomicidad garantiza que, cuando la aplicación añade el NFT a una venta, ambas operaciones se confirman o revierten juntas. Sin embargo, el programa Anchor no valida los hitos ni guarda una PDA de emisión única: la comprobación de duplicados se hace leyendo los Attributes de la colección desde la aplicación. La wallet owner que controla la colección podría crear Assets por fuera del dashboard y saltarse esas comprobaciones. Este es el alcance del taller; una futura validación anti-fraude on-chain requeriría modificar Anchor, regenerar IDL/Codama y desplegar una nueva versión.
+La atomicidad aplica cuando la app incluye el Asset: la venta, la emisión de puntos Token-2022 (si corresponde) y el NFT se confirman o revierten juntos. Si no se cumple un hito, ya existe ese reconocimiento, falta la colección, falta la metadata del hito o el cliente no tiene wallet vinculada, la app registra la venta sin NFT. El reconocimiento elegible queda pendiente cuando faltaba la wallet o la configuración necesaria y puede emitirse después desde **Pendientes**.
 
-Diseño y decisiones técnicas: [docs/metaplex-core-recognition-design.md](docs/metaplex-core-recognition-design.md).
+La regla de hitos y la prevención de duplicados no son restricciones on-chain. La app cuenta las cuentas `Venta` de ese concesionario y cliente y consulta los Attributes de la colección antes de emitir. La wallet owner, como update authority, puede crear Assets directamente fuera del dashboard y omitir esas comprobaciones. Una garantía anti-fraude requeriría incorporar validación y recibos únicos en Anchor, regenerar IDL/Codama y desplegar una nueva versión.
 
----
+### Evidencia Devnet requerida para la entrega
+
+El código y la interfaz implementan el flujo, pero el README todavía necesita enlazar las transacciones y direcciones concretas de la demostración NFT. No se deben reutilizar como evidencia NFT las firmas de Token-2022 de otras operaciones.
+
+| Evidencia | Qué debe enlazarse | Estado en este repositorio |
+| --- | --- | --- |
+| Colección Core | Dirección de la colección por concesionario y su página de Solana Explorer (Devnet). | **Pendiente de añadir la dirección real.** |
+| Asset emitido | Dirección de al menos un Asset y su página de Explorer, mostrando owner, colección y Attributes. | **Pendiente de añadir la dirección real.** |
+| Venta + emisión automática | Firma de una transacción de venta que incluya `registrar_venta` y `create` de Core en la misma transacción. | **Pendiente de añadir la firma real.** |
+| Venta sin emisión | Firma de una venta que no alcance un hito (por ejemplo, la segunda compra) y que solo registre la venta. | **Pendiente de añadir la firma real.** |
+| Emisión pendiente | Firma de la emisión manual desde **Pendientes**, dirección del Asset y costo medido en SOL. | **Pendiente de añadir firma, Asset y costo observados.** |
+
+Para medir la emisión pendiente, la interfaz consulta el saldo de la wallet owner inmediatamente antes y después de la transacción y muestra la diferencia en SOL. Es un **costo aproximado total** de esa operación (renta de la cuenta del Asset más comisión de red), no una medición aislada de la renta.
+
+**Diseño y decisiones técnicas:** [docs/metaplex-core-recognition-design.md](docs/metaplex-core-recognition-design.md).
+
+
+## Prueba rápida en la aplicación desplegada (recomendada)
+
+Para evaluar el proyecto **no necesitas clonar el repositorio ni configurar Node.js, Redis/Upstash o variables de entorno**. La aplicación ya está desplegada y esos servicios están configurados en el entorno de Vercel.
+
+1. Abre **[MotoLedger – aplicación en vivo](https://moto-ledger-token-2022.vercel.app/)**.
+2. Asegúrate de utilizar **Solana Devnet** en tu wallet y en la aplicación.
+3. Conecta la wallet owner de un concesionario de prueba. Para probar como comprador, utiliza una segunda wallet distinta.
+4. Sigue el [flujo de prueba de extremo a extremo](#flujo-de-prueba-de-extremo-a-extremo) descrito abajo.
+
+**Qué necesitas:** un navegador compatible con una wallet Solana (por ejemplo, Solflare o Phantom), dos wallets (owner y comprador), y SOL de Devnet para las transacciones que deban pagar comisiones. Es recomendable tener el dashboard abierto en un equipo y utilizar el teléfono para abrir los QR como comprador. No compartas claves privadas ni frases semilla.
+
+> [!IMPORTANT]
+> **Las wallets owner y comprador tienen funciones distintas.** El dashboard carga los concesionarios registrados por la wallet conectada. Para explorar y administrar el concesionario de demostración, conecta la **misma wallet owner** con la que fue creado. Si conectas una wallet nueva que no haya registrado concesionarios, verás **“No encontramos concesionarios para esta wallet”**. Esto es esperado: los datos siguen en Devnet, pero esa wallet no es la autoridad de esos concesionarios.
+>
+> | Wallet | Dónde se utiliza | Qué hace |
+> | --- | --- | --- |
+> | **Owner** | Dashboard de MotoLedger | Administra el concesionario, registra ventas y genera los QR. Debe permanecer conectada durante el proceso. |
+> | **Comprador** | Ventana, pestaña o dispositivo aparte al abrir el QR | Conecta su wallet para firmar la vinculación y el canje. No necesita concesionarios ni registros propios en el dashboard. |
+>
+> **No necesitas desconectar la wallet owner para utilizar la wallet del comprador.** Al generar un QR desde el dashboard, abre su enlace en el móvil o en otra ventana/pestaña del navegador y conecta allí la wallet del comprador. La sesión del dashboard permanece abierta con el owner conectado.
+
+
+## Organización del dashboard
+
+El dashboard comienza en **Configuración**, que concentra el registro y la selección de concesionarios, junto con la política de garantía de cada uno. Una vez preparado el concesionario, el trabajo operativo se distribuye en este orden:
+
+1. **Configuración:** registrar o seleccionar el concesionario y establecer la duración y el kilometraje máximo de garantía.
+2. **Inventario:** registrar motos o precargar el catálogo de demostración.
+3. **Clientes:** registrar o precargar clientes y administrar sus asociaciones con el concesionario.
+4. **Ventas:** registrar las ventas utilizando motos disponibles y clientes registrados.
+5. **Fidelización:** configurar el programa Token-2022, consultar recompensas y gestionar canjes.
+6. **Reconocimientos NFT:** administrar la colección Metaplex Core y los certificados por hitos de compras.
+7. **Servicios:** administrar el catálogo y los trabajos de posventa.
+
+El registro de concesionarios solo se realiza desde **Configuración**. Los demás módulos conservan el selector del concesionario; si la wallet conectada no tiene uno registrado, muestran un acceso a Configuración en lugar de repetir el formulario. Si la garantía todavía no está configurada, el estado on-chain lo indica y ofrece ir directamente a su configuración antes de registrar motos.
+
 
 ## Preparar datos de demostración
 
@@ -297,7 +325,7 @@ La instrucción `configurar_programa_fidelidad` comprueba que el token program s
 - **Wallet del comprador:** autoridad de su cuenta de tokens; firma el canje para autorizar el burn.
 - **Token-2022:** valida las operaciones del mint y de las cuentas de tokens, incluida la restricción de no transferencia.
 
-Esta entrega **no implementa `PermanentDelegate`, recuperación administrativa de tokens ni reversión de recompensas por anulación de ventas**. Tampoco incluye NFT. No debe afirmarse que existe recuperación privilegiada de puntos: los tokens son no transferibles y el canje los quema con autorización del comprador.
+El alcance descrito en esta sección corresponde exclusivamente a los puntos y canjes Token-2022: no implementa `PermanentDelegate`, recuperación administrativa de tokens ni reversión de recompensas por anulación de ventas. Los reconocimientos NFT se implementan por separado con Metaplex Core y se documentan en la sección principal de este README.
 
 ## Rechazos y cómo reportarlos
 
@@ -386,8 +414,8 @@ Los archivos se consultan mediante el gateway con la ruta `/ipfs/<CID>`. Por eso
 Clona el repositorio e instala las dependencias:
 
 ```bash
-git clone https://github.com/neocarvajal/moto-ledger-token-2022.git
-cd moto-ledger-token-2022
+git clone https://github.com/neocarvajal/moto-ledger-nfts-metaplex-core.git
+cd moto-ledger-nfts-metaplex-core
 npm install
 ```
 
