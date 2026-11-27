@@ -15,6 +15,7 @@ import {
   create,
   createCollection,
   fetchAssetsByCollection,
+  fetchCollection,
   mplCore,
 } from "@metaplex-foundation/mpl-core";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
@@ -68,56 +69,6 @@ export function recognitionMilestone(purchases: number): RecognitionMilestone | 
     : null;
 }
 
-function storageKey(owner: string, dealership: string, cluster: ClusterMoniker) {
-  return `moto-ledger:recognitions:${cluster}:${owner}:${dealership}`;
-}
-
-export function readRecognitionConfig(
-  owner: string,
-  dealership: string,
-  cluster: ClusterMoniker
-): RecognitionConfig | null {
-  try {
-    const raw = localStorage.getItem(storageKey(owner, dealership, cluster));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<RecognitionConfig>;
-    if (typeof parsed.collection !== "string") return null;
-    const legacyUri = typeof parsed.metadataUri === "string" ? parsed.metadataUri : undefined;
-    const collectionMetadata =
-      parsed.collectionMetadata && typeof parsed.collectionMetadata.metadataUri === "string"
-        ? parsed.collectionMetadata
-        : legacyUri
-          ? { name: "", symbol: "", description: "", imageUri: "", metadataUri: legacyUri }
-          : undefined;
-    const milestones = parsed.milestones && typeof parsed.milestones === "object"
-      ? parsed.milestones
-      : {};
-    return {
-      collection: parsed.collection,
-      ...(collectionMetadata ? { collectionMetadata } : {}),
-      milestones,
-      metadataUri: legacyUri ?? collectionMetadata?.metadataUri ?? "",
-    };
-  } catch {
-    return null;
-  }
-}
-
-export function saveRecognitionConfig(
-  owner: string,
-  dealership: string,
-  cluster: ClusterMoniker,
-  config: RecognitionConfig | null
-) {
-  try {
-    const key = storageKey(owner, dealership, cluster);
-    if (config) localStorage.setItem(key, JSON.stringify(config));
-    else localStorage.removeItem(key);
-  } catch {
-    // Storage may be unavailable in private browsing contexts.
-  }
-}
-
 export function normalizeRecognitionMetadataUri(value: string) {
   let uri = value.trim();
   const githubBlob = uri.match(
@@ -133,6 +84,15 @@ export function normalizeRecognitionMetadataUri(value: string) {
     throw new Error("La URL de metadata supera los 200 caracteres.");
   }
   return uri;
+}
+
+/** Fetching with the Core client validates that the address is a Metaplex Core collection. */
+export async function verifyRecognitionCoreCollection(
+  cluster: ClusterMoniker,
+  collection: string
+) {
+  const umi = createRecognitionUmi(cluster);
+  return fetchCollection(umi, publicKey(collection));
 }
 
 function createRecognitionUmi(cluster: ClusterMoniker): Umi {
