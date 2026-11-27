@@ -483,47 +483,58 @@ export function SalesManagement({
           };
         }
       }
-      if (recognitionConfig && customerWalletAddress) {
-        const saleDiscriminator = getBase58Decoder().decode(
-          getVentaDiscriminatorBytes()
-        ) as Base58EncodedBytes;
-        const dealershipFilter = dealerAddress as Base58EncodedBytes;
-        const customerFilter = cliente as Base58EncodedBytes;
-        const priorSales = await client.rpc.getProgramAccounts(
-          REGISTRO_PROGRAM_ADDRESS,
-          {
-            encoding: "base64",
-            filters: [
-              { memcmp: { offset: 0n, bytes: saleDiscriminator, encoding: "base58" } },
-              { memcmp: { offset: 8n, bytes: dealershipFilter, encoding: "base58" } },
-              { memcmp: { offset: 40n, bytes: customerFilter, encoding: "base58" } },
-            ],
-          }
-        ).send();
-        const milestone = recognitionMilestone(priorSales.length + 1);
-        if (milestone && recognitionConfig.milestones?.[milestone]?.metadataUri) {
-          const alreadyIssued = await recognitionAlreadyIssued(
-            cluster,
-            recognitionConfig.collection,
-            cliente,
-            dealerAddress,
-            milestone
-          );
-          if (!alreadyIssued) {
-            const built = await buildRecognitionAssetInstructions({
+      let eligibleRecognitionMilestone: number | null = null;
+      let recognitionPreparationError: string | null = null;
+      const saleDiscriminator = getBase58Decoder().decode(
+        getVentaDiscriminatorBytes()
+      ) as Base58EncodedBytes;
+      const dealershipFilter = dealerAddress as Base58EncodedBytes;
+      const customerFilter = cliente as Base58EncodedBytes;
+      const priorSales = await client.rpc.getProgramAccounts(
+        REGISTRO_PROGRAM_ADDRESS,
+        {
+          encoding: "base64",
+          filters: [
+            { memcmp: { offset: 0n, bytes: saleDiscriminator, encoding: "base58" } },
+            { memcmp: { offset: 8n, bytes: dealershipFilter, encoding: "base58" } },
+            { memcmp: { offset: 40n, bytes: customerFilter, encoding: "base58" } },
+          ],
+        }
+      ).send();
+      const milestone = recognitionMilestone(priorSales.length + 1);
+      if (milestone) {
+        eligibleRecognitionMilestone = milestone;
+        const metadataUri = recognitionConfig?.milestones?.[milestone]?.metadataUri;
+        if (recognitionConfig && customerWalletAddress && metadataUri) {
+          try {
+            const alreadyIssued = await recognitionAlreadyIssued(
               cluster,
-              owner,
-              ownerSigner: connected.signer,
-              collection: recognitionConfig.collection,
-              metadataUri: recognitionConfig.milestones?.[milestone]?.metadataUri ?? "",
-              customerWallet: customerWalletAddress,
-              customer: cliente,
-              dealership: dealerAddress,
-              sale: venta,
-              milestone,
-            });
-            recognitionInstructions = built.instructions;
-            awardedRecognition = { milestone, asset: built.asset };
+              recognitionConfig.collection,
+              cliente,
+              dealerAddress,
+              milestone
+            );
+            if (!alreadyIssued) {
+              const built = await buildRecognitionAssetInstructions({
+                cluster,
+                owner,
+                ownerSigner: connected.signer,
+                collection: recognitionConfig.collection,
+                metadataUri,
+                customerWallet: customerWalletAddress,
+                customer: cliente,
+                dealership: dealerAddress,
+                sale: venta,
+                milestone,
+              });
+              recognitionInstructions = built.instructions;
+              awardedRecognition = { milestone, asset: built.asset };
+            }
+          } catch (preparationError) {
+            recognitionPreparationError = preparationError instanceof Error
+              ? preparationError.message
+              : "No se pudo preparar el NFT.";
+            console.warn("El hito se alcanzó, pero el NFT se procesará desde Reconocimientos:", preparationError);
           }
         }
       }
@@ -629,16 +640,19 @@ export function SalesManagement({
             console.warn("No se pudo verificar el estado del NFT:", reconciliationError);
           }
           if (!recognitionIssued) {
-            toast.warning("La venta se registró correctamente. El reconocimiento NFT quedó pendiente y podrás emitirlo desde Reconocimientos.");
+            console.warn("La emisión automática del NFT quedó pendiente:", recognitionError);
           }
         }
       }
 
       const recognitionMessage = recognitionIssued && awardedRecognition
         ? `Reconocimiento NFT de ${awardedRecognition.milestone} ${awardedRecognition.milestone === 1 ? "compra" : "compras"} emitido.`
-        : awardedRecognition
-          ? `El reconocimiento de ${awardedRecognition.milestone} ${awardedRecognition.milestone === 1 ? "compra" : "compras"} quedó pendiente de emisión.`
+        : eligibleRecognitionMilestone
+          ? `El reconocimiento del hito ${eligibleRecognitionMilestone} quedó pendiente de emisión.`
           : "";
+      if (eligibleRecognitionMilestone && !recognitionIssued) {
+        toast.warning("La venta se registró correctamente. El reconocimiento NFT quedó pendiente y podrás emitirlo desde Reconocimientos.");
+      }
       const successMessage = [
         "Venta registrada correctamente en Solana.",
         awardedPoints !== null
@@ -660,7 +674,7 @@ export function SalesManagement({
         customerName: customer.data.nombreCliente,
         motorcycle: `${motorcycle.data.marca} ${motorcycle.data.modelo} · ${motorcycle.data.serial}`,
         recognition: recognitionIssued ? awardedRecognition : null,
-        recognitionPending: awardedRecognition && !recognitionIssued ? awardedRecognition.milestone : null,
+        recognitionPending: eligibleRecognitionMilestone && !recognitionIssued ? eligibleRecognitionMilestone : null,
       });
       setCedula("");
       setPrice("");
