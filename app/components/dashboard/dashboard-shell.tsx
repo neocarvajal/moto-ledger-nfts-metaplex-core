@@ -12,6 +12,7 @@ const navigation = [
   { id: "motorcycles", label: "Inventario", icon: "◫", group: "GESTIÓN" },
   { id: "customers", label: "Clientes", icon: "♙" },
   { id: "sales", label: "Ventas", icon: "↗" },
+  { id: "recognitions", label: "Reconocimientos NFT", icon: "◇", group: "GESTIÓN" },
   { id: "loyalty", label: "Fidelización", icon: "✦", group: "GESTIÓN" },
   { id: "services", label: "Servicios", icon: "⚙" },
   { id: "warranties", label: "Garantías", icon: "◇", group: "POSVENTA", disabled: true },
@@ -34,6 +35,10 @@ const pageCopy: Record<string, { title: string; description: string }> = {
   services: {
     title: "Servicios",
     description: "Mantenimientos, reparaciones y trabajos realizados.",
+  },
+  recognitions: {
+    title: "Reconocimientos NFT",
+    description: "Certificados Metaplex Core por hitos de compras de cada concesionario.",
   },
   loyalty: {
     title: "Fidelización",
@@ -288,8 +293,8 @@ export function DashboardShell() {
             <NetworkStatusBadge />
           </div>
 
-          <div className={active === "motorcycles" || active === "customers" || active === "sales" || active === "services" || active === "loyalty" || active === "settings" ? "" : "hidden"}><DealershipWorkspace activeModule={active} onNavigate={setActive} /></div>
-          {active !== "motorcycles" && active !== "customers" && active !== "sales" && active !== "services" && active !== "loyalty" && active !== "settings" && <EmptySection title={page.title} />}
+          <div className={active === "motorcycles" || active === "customers" || active === "sales" || active === "recognitions" || active === "services" || active === "loyalty" || active === "settings" ? "" : "hidden"}><DealershipWorkspace activeModule={active} onNavigate={setActive} /></div>
+          {active !== "motorcycles" && active !== "customers" && active !== "sales" && active !== "recognitions" && active !== "services" && active !== "loyalty" && active !== "settings" && <EmptySection title={page.title} />}
 
           <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-[#e9ebee] pt-4 text-[9px] text-[#a0a6ad]">
             <span>MOTOLEDGER · GESTIÓN DE CONCESIONARIOS</span>
