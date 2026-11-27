@@ -210,7 +210,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     } finally {
       setLoading(false);
     }
-  }, [client, concesionario, connectedAccountAddress]);
+  }, [client, concesionario, connected]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -363,7 +363,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     const payload = await response.json() as { error?: string };
     if (!response.ok) throw new Error(payload.error ?? "No se pudo entregar la transacción al cliente.");
     setSession((current) => current?.token === token ? { ...current, status: "waiting_customer_signature" } : current);
-  }, [client, connectedSigner, connectedAccountAddress, selectedCustomerRecord, selectedSaleRecord,
+  }, [client, connected, selectedCustomerRecord, selectedSaleRecord,
     selectedServiceRecord, wallet, mint, mileage, concesionario, selectedCustomer]);
 
   useEffect(() => {
@@ -582,7 +582,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
 
       {selectedServiceRecord && <p className="mt-3 text-[10px] text-[#68717b]">El canje quemará {selectedServiceRecord.puntos.toLocaleString("es-VE")} puntos del mint {shortAddress(mint)}. La garantía cubierta no consume puntos; Solana vuelve a validar todas las cuentas y condiciones al ejecutar.</p>}
 
-      <button type="button" onClick={() => void startRedemption()} disabled={!catalogReady || busy || loading || checking || !selectedCustomer || !selectedSale || !selectedService || !wallet || balance === null || !saleDetails || !mileage || Boolean(session)} className="mt-4 w-full rounded-lg bg-[#e60012] px-4 py-3 text-[11px] font-bold text-white hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Preparando canje…" : "Generar QR para autorizar el canje"}</button>
+      <button type="button" onClick={() => void startRedemption()} disabled={!catalogReady || busy || loading || checking || !selectedCustomer || !selectedSale || !selectedService || !wallet || balance === null || !activeSaleDetails || !mileage || Boolean(session)} className="mt-4 w-full rounded-lg bg-[#e60012] px-4 py-3 text-[11px] font-bold text-white hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Preparando canje…" : "Generar QR para autorizar el canje"}</button>
 
       {showQrModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto overscroll-contain bg-[#171b20]/55 p-4 backdrop-blur-md">
