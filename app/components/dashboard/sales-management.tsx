@@ -71,6 +71,7 @@ type SaleConfirmation = {
   customerName: string;
   motorcycle: string;
   recognition: { milestone: number; asset: string } | null;
+  recognitionPending: number | null;
 };
 type SaleDetails = {
   sale: SaleRecord;
@@ -446,6 +447,7 @@ export function SalesManagement({
       let awardedWallet: string | null = null;
       let awardedRecognition: { milestone: number; asset: string } | null = null;
       let recognitionInstructions: Instruction[] = [];
+      let recognitionIssued = false;
       let customerWalletAddress: string | null = null;
       let reconciledOnChain = false;
 
@@ -568,22 +570,15 @@ export function SalesManagement({
             tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
           });
 
-          // ATA creation (when needed), sale registration and reward issuance
-          // are submitted atomically: any failure rolls back all three operations.
-          // Sale, Token-2022 rewards and any earned Core recognition share one atomic transaction.
+          // Sale and Token-2022 reward remain atomic. Metaplex Core issuance
+          // runs separately so an NFT failure can never roll back a confirmed sale.
           result = await client.sendTransaction([
             createAtaInstruction,
             saleInstruction,
             rewardInstruction,
-            ...recognitionInstructions,
           ]);
           awardedPoints = loyaltyProgram.data.puntosPorVenta;
           awardedWallet = customerWallet;
-        } else if (recognitionInstructions.length > 0) {
-          result = await client.sendTransaction([
-            saleInstruction,
-            ...recognitionInstructions,
-          ]);
         } else {
           result = await saleInstruction.sendTransaction();
         }
@@ -600,13 +595,7 @@ export function SalesManagement({
               client.rpc.getAccountInfo(venta, { encoding: "base64" }).send(),
               client.rpc.getAccountInfo(puntosVenta, { encoding: "base64" }).send(),
             ]);
-            const assetInfo = awardedRecognition
-              ? await client.rpc.getAccountInfo(
-                  address(awardedRecognition.asset),
-                  { encoding: "base64" }
-                ).send()
-              : null;
-            if (saleInfo.value && (!awardedRecognition || assetInfo?.value)) {
+            if (saleInfo.value) {
               reconciledOnChain = true;
               if (rewardInfo.value) {
                 const rewardRecord = await client.registro.accounts.puntosVenta.fetch(puntosVenta);
@@ -622,9 +611,34 @@ export function SalesManagement({
         if (!reconciledOnChain) throw sendError;
       }
 
-      const recognitionMessage = awardedRecognition
+      // Core recognition is deliberately issued after the sale has landed.
+      // If this transaction fails, the sale remains confirmed and the module
+      // will expose the milestone in its pending queue for a later retry.
+      if (recognitionInstructions.length > 0 && awardedRecognition) {
+        try {
+          await client.sendTransaction(recognitionInstructions);
+          recognitionIssued = true;
+        } catch (recognitionError) {
+          console.error("La venta quedó registrada, pero el NFT quedó pendiente:", recognitionError);
+          try {
+            const assetInfo = await client.rpc
+              .getAccountInfo(address(awardedRecognition.asset), { encoding: "base64" })
+              .send();
+            recognitionIssued = Boolean(assetInfo.value);
+          } catch (reconciliationError) {
+            console.warn("No se pudo verificar el estado del NFT:", reconciliationError);
+          }
+          if (!recognitionIssued) {
+            toast.warning("La venta se registró correctamente. El reconocimiento NFT quedó pendiente y podrás emitirlo desde Reconocimientos.");
+          }
+        }
+      }
+
+      const recognitionMessage = recognitionIssued && awardedRecognition
         ? `Reconocimiento NFT de ${awardedRecognition.milestone} ${awardedRecognition.milestone === 1 ? "compra" : "compras"} emitido.`
-        : "";
+        : awardedRecognition
+          ? `El reconocimiento de ${awardedRecognition.milestone} ${awardedRecognition.milestone === 1 ? "compra" : "compras"} quedó pendiente de emisión.`
+          : "";
       const successMessage = [
         "Venta registrada correctamente en Solana.",
         awardedPoints !== null
@@ -645,7 +659,8 @@ export function SalesManagement({
         saleAddress: venta,
         customerName: customer.data.nombreCliente,
         motorcycle: `${motorcycle.data.marca} ${motorcycle.data.modelo} · ${motorcycle.data.serial}`,
-        recognition: awardedRecognition,
+        recognition: recognitionIssued ? awardedRecognition : null,
+        recognitionPending: awardedRecognition && !recognitionIssued ? awardedRecognition.milestone : null,
       });
       setCedula("");
       setPrice("");
@@ -831,6 +846,14 @@ export function SalesManagement({
                 <a href={getExplorerUrl(`address/${lastSaleConfirmation.recognition.asset}`)} target="_blank" rel="noopener noreferrer" className="mt-2 block break-all font-mono text-[9px] text-[#42658a] underline decoration-dotted underline-offset-2">
                   Ver Asset en Explorer: {lastSaleConfirmation.recognition.asset} ↗
                 </a>
+              </div>
+            )}
+            {lastSaleConfirmation.recognitionPending !== null && (
+              <div className="mt-3 rounded-lg border border-[#f0dfbd] bg-white p-4">
+                <p className="text-[9px] font-bold tracking-[0.12em] text-[#9a6a20]">RECONOCIMIENTO NFT PENDIENTE</p>
+                <p className="mt-1 text-[10px] text-[#68717b]">
+                  El hito de {lastSaleConfirmation.recognitionPending} {lastSaleConfirmation.recognitionPending === 1 ? "compra" : "compras"} ya se alcanzó. La venta está confirmada; puedes reintentar la emisión desde el módulo Reconocimientos.
+                </p>
               </div>
             )}
             <div className="mt-3 flex flex-wrap gap-3 text-[9px] font-semibold">
