@@ -64,7 +64,10 @@ export function CustomerWalletLink({
   const sendingRef = useRef(false);
   const cancelledRef = useRef(false);
   const sessionRef = useRef(session);
-  sessionRef.current = session;
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
   useEffect(() => {
     if (!showLinkModal && !showUnlinkModal) return;
