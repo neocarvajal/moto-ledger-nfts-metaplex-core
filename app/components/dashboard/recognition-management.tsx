@@ -36,6 +36,7 @@ import {
   buildRecognitionCollectionInstructions,
   normalizeRecognitionMetadataUri,
   readIssuedRecognitions,
+  recognitionAlreadyIssued,
   verifyRecognitionCoreCollection,
   type IssuedRecognition,
   type RecognitionConfig,
@@ -260,6 +261,12 @@ export function RecognitionManagement({
         .map((milestone) => ({ customer, milestone }))
     );
   }, [customers, issued]);
+  const readyPending = useMemo(
+    () => pending.filter(({ customer, milestone }) =>
+      Boolean(customer.wallet && config?.milestones?.[milestone]?.metadataUri)
+    ),
+    [pending, config]
+  );
 
   const registerCollection = async (collectionAddress: string, uriValue: string) => {
     if (!connected?.signer || !owner) throw new Error("Conecta la wallet owner del concesionario.");
@@ -349,6 +356,18 @@ export function RecognitionManagement({
     setError("");
     setLastResult("");
     try {
+      const alreadyIssued = await recognitionAlreadyIssued(
+        cluster,
+        config.collection,
+        customer.address,
+        concesionario,
+        milestone
+      );
+      if (alreadyIssued) {
+        setLastResult(`El reconocimiento del hito ${milestone} ya existe en la colección; no se emitió un duplicado.`);
+        await loadData();
+        return;
+      }
       const built = await buildRecognitionAssetInstructions({
         cluster,
         owner,
@@ -371,6 +390,62 @@ export function RecognitionManagement({
     } catch (issueError) {
       console.error("No se pudo emitir el reconocimiento:", issueError);
       setError(issueError instanceof Error ? issueError.message : "No se pudo emitir el reconocimiento NFT.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const issueAllPending = async () => {
+    if (!connected?.signer || !owner || !config) return;
+    if (readyPending.length === 0) {
+      toast.info("No hay reconocimientos listos para emitir. Revisa las wallets y la metadata de los hitos.");
+      return;
+    }
+    setBusy("batch");
+    setError("");
+    setLastResult("");
+    let emitted = 0;
+    let alreadyPresent = 0;
+    const failures: string[] = [];
+    try {
+      for (const { customer, milestone } of readyPending) {
+        try {
+          const exists = await recognitionAlreadyIssued(
+            cluster,
+            config.collection,
+            customer.address,
+            concesionario,
+            milestone
+          );
+          if (exists) {
+            alreadyPresent += 1;
+            continue;
+          }
+          const metadataUriForMilestone = config.milestones?.[milestone]?.metadataUri;
+          if (!metadataUriForMilestone || !customer.wallet) continue;
+          const built = await buildRecognitionAssetInstructions({
+            cluster,
+            owner,
+            ownerSigner: connected.signer,
+            collection: config.collection,
+            metadataUri: metadataUriForMilestone,
+            customerWallet: customer.wallet,
+            customer: customer.address,
+            dealership: concesionario,
+            sale: customer.milestoneSales[milestone] ?? "",
+            milestone,
+          });
+          await client.sendTransaction(built.instructions);
+          emitted += 1;
+        } catch (issueError) {
+          failures.push(`${customer.name} · hito ${milestone}: ${issueError instanceof Error ? issueError.message : "error de emisión"}`);
+        }
+      }
+      await loadData();
+      setLastResult(`Proceso por lote finalizado: ${emitted} NFT emitido(s), ${alreadyPresent} ya existente(s), ${failures.length} pendiente(s) por error.`);
+      if (failures.length > 0) {
+        setError(`No se pudieron emitir algunos reconocimientos. Puedes reintentarlos individualmente o volver a ejecutar el lote. ${failures.slice(0, 3).join(" | ")}`);
+      }
     } finally {
       setBusy(null);
     }
@@ -460,7 +535,7 @@ export function RecognitionManagement({
         )}
       </section>
 
-      {busy && busy !== "collection" && <p className="rounded-lg bg-[#fff9ef] px-4 py-3 text-[10px] text-[#9a6a20]">Procesando reconocimiento… revisa tu wallet.</p>}
+      {busy && busy !== "collection" && <p className="rounded-lg bg-[#fff9ef] px-4 py-3 text-[10px] text-[#9a6a20]">{busy === "batch" ? "Procesando el lote de reconocimientos. Aprueba las transacciones en tu wallet." : "Procesando reconocimiento… revisa tu wallet."}</p>}
       {lastResult && <p className="rounded-lg border border-[#ccebdc] bg-[#f0faf5] px-4 py-3 text-[10px] text-[#176b4b]" role="status">{lastResult}</p>}
       {error && <p className="rounded-lg border border-[#f2d1d1] bg-[#fff5f5] px-4 py-3 text-[10px] text-[#c43d3d]" role="alert">{error}</p>}
 
@@ -469,9 +544,15 @@ export function RecognitionManagement({
       )}
 
       <section className="overflow-hidden rounded-xl border border-[#e9ebee] bg-white shadow-[0_2px_8px_rgba(24,32,40,0.025)]">
-        <div className="border-b border-[#eff0f2] px-6 py-4">
-          <p className="text-[9px] font-bold tracking-[0.16em] text-[#e60012]">PENDIENTES</p>
-          <h3 className="mt-1 text-[14px] font-bold text-[#252a30]">Clientes que ya alcanzaron un hito</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eff0f2] px-6 py-4">
+          <div>
+            <p className="text-[9px] font-bold tracking-[0.16em] text-[#e60012]">PENDIENTES</p>
+            <h3 className="mt-1 text-[14px] font-bold text-[#252a30]">Clientes que ya alcanzaron un hito</h3>
+            <p className="mt-1 text-[9px] text-[#9299a1]">{readyPending.length} listo(s) para emitir · {pending.length - readyPending.length} requieren wallet o metadata</p>
+          </div>
+          <button type="button" onClick={() => void issueAllPending()} disabled={busy !== null || readyPending.length === 0} className="rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-bold text-white hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">
+            {busy === "batch" ? "Emitiendo lote…" : `Emitir todos los disponibles (${readyPending.length})`}
+          </button>
         </div>
         {!config ? (
           <p className="p-5 text-[10px] text-[#858d96]">Registra la colección en Solana para consultar y emitir reconocimientos pendientes.</p>
