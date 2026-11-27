@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
 import { RecognitionMilestoneUploader } from "./recognition-milestone-uploader";
+import { RecognitionCollectionMetadataUploader } from "./recognition-collection-metadata-uploader";
 import { useCluster } from "../cluster-context";
 import {
   deriveWalletClientePda,
@@ -337,6 +338,14 @@ export function RecognitionManagement({
                 </>
               ) : (
                 <>
+                  <RecognitionCollectionMetadataUploader
+                    client={client}
+                    owner={owner}
+                    dealership={concesionario}
+                    dealershipName={nombreConcesionario}
+                    cluster={cluster}
+                    onUploaded={setMetadataUri}
+                  />
                   <label className="mt-3 block">
                     <span className="mb-1 block text-[9px] font-semibold text-[#68717b]">URL HTTPS del JSON de metadata (Pinata/IPFS)</span>
                     <input value={metadataUri} onChange={(event) => setMetadataUri(event.target.value)} required placeholder="https://gateway.mypinata.cloud/ipfs/..." spellCheck={false} className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2 text-[10px] outline-none focus:border-[#e60012]" />
