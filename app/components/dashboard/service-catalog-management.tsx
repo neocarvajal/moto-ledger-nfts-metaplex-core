@@ -75,7 +75,10 @@ export function ServiceCatalogManagement({
   }, [client, concesionario]);
 
   useEffect(() => {
-    void loadCatalog();
+    const timer = window.setTimeout(() => {
+      void loadCatalog();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadCatalog]);
 
   const assertOwner = async () => {
