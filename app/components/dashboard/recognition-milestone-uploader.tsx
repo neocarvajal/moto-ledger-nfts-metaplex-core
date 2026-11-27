@@ -141,7 +141,9 @@ export function RecognitionMilestoneUploader({
     try {
       let current = config;
       for (const milestone of MILESTONES) {
-        if (files[milestone]) current = await saveMilestone(milestone, current);
+        if (files[milestone] || !current.milestones?.[milestone]) {
+          current = await saveMilestone(milestone, current);
+        }
       }
       setStatus("Las tres metadata de reconocimiento están cargadas.");
     } catch (error) {
