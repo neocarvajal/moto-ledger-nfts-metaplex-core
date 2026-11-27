@@ -39,7 +39,7 @@ export type RecognitionConfig = {
   collectionMetadata?: RecognitionMetadata;
   milestones?: Partial<Record<RecognitionMilestone, RecognitionMetadata>>;
   /** Legacy collection metadata URI; retained for old local configurations. */
-  metadataUri?: string;
+  metadataUri: string;
 };
 
 export type IssuedRecognition = {
@@ -96,7 +96,7 @@ export function readRecognitionConfig(
       collection: parsed.collection,
       ...(collectionMetadata ? { collectionMetadata } : {}),
       milestones,
-      ...(legacyUri ? { metadataUri: legacyUri } : {}),
+      metadataUri: legacyUri ?? collectionMetadata?.metadataUri ?? "",
     };
   } catch {
     return null;
