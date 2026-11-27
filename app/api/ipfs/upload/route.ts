@@ -162,7 +162,29 @@ export async function POST(request: Request) {
     const timestampValue = Number(form.get("timestamp"));
     const nonce = String(form.get("nonce") ?? "");
     const signature = String(form.get("signature") ?? "");
+    const purpose = String(form.get("purpose") ?? "token");
+    const milestoneValue = String(form.get("milestone") ?? "");
+    let attributes: Array<{ trait_type: string; value: string | number }> = [];
+    try {
+      const rawAttributes = String(form.get("attributes") ?? "[]");
+      const parsed = JSON.parse(rawAttributes) as unknown;
+      if (Array.isArray(parsed)) {
+        attributes = parsed.filter((item): item is { trait_type: string; value: string | number } =>
+          Boolean(item) && typeof item === "object" &&
+          typeof (item as { trait_type?: unknown }).trait_type === "string" &&
+          ["string", "number"].includes(typeof (item as { value?: unknown }).value)
+        ).slice(0, 12);
+      }
+    } catch {
+      return NextResponse.json({ error: "Los atributos de metadata no tienen un formato válido." }, { status: 400 });
+    }
 
+    if (!["token", "collection", "milestone"].includes(purpose)) {
+      return NextResponse.json({ error: "El propósito de la carga no es válido." }, { status: 400 });
+    }
+    if (purpose === "milestone" && !["1", "3", "5"].includes(milestoneValue)) {
+      return NextResponse.json({ error: "El hito debe ser 1, 3 o 5." }, { status: 400 });
+    }
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Debes seleccionar una imagen." }, { status: 400 });
     }
