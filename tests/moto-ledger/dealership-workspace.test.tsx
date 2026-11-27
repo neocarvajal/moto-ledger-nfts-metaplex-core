@@ -165,6 +165,7 @@ describe("MotoLedger dealership workspace", () => {
     const selector = (await screen.findByRole("combobox")) as HTMLSelectElement;
     expect(selector.value).toBe("");
     expect(Array.from(selector.options).map((option) => option.value)).toEqual([
+      "",
       "dealership-a",
       "dealership-b",
     ]);
