@@ -11,6 +11,7 @@ import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
+import { RecognitionMilestoneUploader } from "./recognition-milestone-uploader";
 import { useCluster } from "../cluster-context";
 import {
   deriveWalletClientePda,
@@ -251,6 +252,10 @@ export function RecognitionManagement({
 
   const issue = async (customer: CustomerProgress, milestone: number) => {
     if (!connected?.signer || !owner || !config) return;
+    if (!config.milestones?.[milestone as 1 | 3 | 5]?.metadataUri) {
+      toast.error("Primero configura la imagen y metadata de este hito.");
+      return;
+    }
     if (!customer.wallet) {
       toast.error("El cliente debe vincular su wallet desde el módulo Clientes.");
       return;
@@ -265,7 +270,7 @@ export function RecognitionManagement({
         owner,
         ownerSigner: connected.signer,
         collection: config.collection,
-        metadataUri: config.metadataUri,
+        metadataUri: config.milestones[milestone as 1 | 3 | 5]!.metadataUri,
         customerWallet: customer.wallet,
         customer: customer.address,
         dealership: concesionario,
@@ -369,6 +374,16 @@ export function RecognitionManagement({
       {lastResult && <p className="rounded-lg border border-[#ccebdc] bg-[#f0faf5] px-4 py-3 text-[10px] text-[#176b4b]" role="status">{lastResult}</p>}
       {error && <p className="rounded-lg border border-[#f2d1d1] bg-[#fff5f5] px-4 py-3 text-[10px] text-[#c43d3d]" role="alert">{error}</p>}
 
+      {config && owner && (
+        <RecognitionMilestoneUploader
+          client={client}
+          owner={owner}
+          dealership={concesionario}
+          cluster={cluster}
+          config={config}
+          onSaved={setConfig}
+        />
+      )}
       <section className="overflow-hidden rounded-xl border border-[#e9ebee] bg-white shadow-[0_2px_8px_rgba(24,32,40,0.025)]">
         <div className="border-b border-[#eff0f2] px-6 py-4">
           <p className="text-[9px] font-bold tracking-[0.16em] text-[#e60012]">PENDIENTES</p>
