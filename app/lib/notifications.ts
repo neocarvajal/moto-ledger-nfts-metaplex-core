@@ -11,6 +11,7 @@ export type AppNotification = {
   read: boolean;
 };
 
+const EMPTY_NOTIFICATIONS: AppNotification[] = [];
 let notifications: AppNotification[] = [];
 let nextId = 1;
 const listeners = new Set<() => void>();
@@ -60,7 +61,7 @@ function getSnapshot() {
 }
 
 function getServerSnapshot(): AppNotification[] {
-  return [];
+  return EMPTY_NOTIFICATIONS;
 }
 
 export function useNotifications() {
