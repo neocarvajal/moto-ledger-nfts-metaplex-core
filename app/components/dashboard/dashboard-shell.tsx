@@ -129,27 +129,6 @@ function Sidebar({
   );
 }
 
-function MetricCard({
-  label,
-  icon,
-  note,
-}: {
-  label: string;
-  icon: string;
-  note: string;
-}) {
-  return (
-    <div className="rounded-xl border border-[#e9ebee] bg-white p-5 shadow-[0_2px_8px_rgba(24,32,40,0.025)]">
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-semibold text-[#7b838c]">{label}</p>
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f6f7f8] text-[17px] text-[#69717a]">{icon}</span>
-      </div>
-      <p className="mt-4 text-[27px] font-bold tracking-[-0.05em] text-[#252a30]">—</p>
-      <p className="mt-1 text-[10px] text-[#a0a6ad]">{note}</p>
-    </div>
-  );
-}
-
 type NetworkStatus = "checking" | "connected" | "disconnected";
 
 function NetworkStatusBadge() {
