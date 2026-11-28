@@ -85,20 +85,27 @@ export function CustomerWalletLink({
 
   useEffect(() => {
     let active = true;
-    setChecking(true);
-    setLinkedWallet(null);
-    void deriveWalletClientePda(address(cliente))
-      .then(([walletCliente]) => client.registro.accounts.walletCliente.fetch(walletCliente))
-      .then((account) => {
-        if (active) setLinkedWallet(account.data.wallet);
-      })
-      .catch(() => {
-        if (active) setLinkedWallet(null);
-      })
-      .finally(() => {
-        if (active) setChecking(false);
-      });
-    return () => { active = false; };
+    const timer = window.setTimeout(() => {
+      if (!active) return;
+      setChecking(true);
+      setLinkedWallet(null);
+      void deriveWalletClientePda(address(cliente))
+        .then(([walletCliente]) => client.registro.accounts.walletCliente.fetch(walletCliente))
+        .then((account) => {
+          if (active) setLinkedWallet(account.data.wallet);
+        })
+        .catch(() => {
+          if (active) setLinkedWallet(null);
+        })
+        .finally(() => {
+          if (active) setChecking(false);
+        });
+    }, 0);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, [client, cliente]);
 
   useEffect(() => {
