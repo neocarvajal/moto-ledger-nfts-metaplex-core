@@ -82,6 +82,7 @@ export function RecognitionManagement({
 }) {
   const client = useAppClient();
   const connected = useConnectedWallet(client);
+  const connectedSigner = connected?.signer;
   const { cluster, getExplorerUrl } = useCluster();
   const owner = connected?.account.address ?? "";
   const [config, setConfig] = useState<RecognitionConfig | null>(null);
@@ -141,23 +142,26 @@ export function RecognitionManagement({
   }, [applyOnChainConfig, client, concesionario, owner]);
 
   useEffect(() => {
-    setError("");
-    setLastResult("");
-    void loadCollectionConfig().catch((loadError) => {
-      console.error("No se pudo consultar la configuración NFT on-chain:", loadError);
-      setError(loadError instanceof Error ? loadError.message : "No se pudo consultar la colección on-chain.");
-    });
+    const timer = window.setTimeout(() => {
+      setError("");
+      setLastResult("");
+      void loadCollectionConfig().catch((loadError) => {
+        console.error("No se pudo consultar la configuración NFT on-chain:", loadError);
+        setError(loadError instanceof Error ? loadError.message : "No se pudo consultar la colección on-chain.");
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadCollectionConfig, owner, cluster]);
 
   const persistMetadata = useCallback(async (next: RecognitionConfig) => {
-    if (!connected?.signer || !owner || !collectionPda) {
+    if (!connectedSigner || !owner || !collectionPda) {
       throw new Error("Conecta la wallet owner para actualizar la metadata on-chain.");
     }
     const collectionMetadataUri = normalizeRecognitionMetadataUri(
       next.collectionMetadata?.metadataUri ?? next.metadataUri
     );
     const ix = getActualizarMetadataReconocimientosInstruction({
-      owner: connected.signer,
+      owner: connectedSigner,
       concesionario: address(concesionario),
       reconocimientoColeccion: address(collectionPda),
       collectionMetadataUri,
@@ -169,7 +173,7 @@ export function RecognitionManagement({
     const refreshed = await fetchReconocimientoColeccion(client.rpc, address(collectionPda));
     applyOnChainConfig(refreshed.data);
     notifyTransactionSuccess("Metadata de reconocimientos actualizada en Solana.", result.context.signature);
-  }, [applyOnChainConfig, client, collectionPda, connected?.signer, concesionario, owner]);
+  }, [applyOnChainConfig, client, collectionPda, connectedSigner, concesionario, owner]);
 
   const loadData = useCallback(async () => {
     if (!owner || !concesionario) {
