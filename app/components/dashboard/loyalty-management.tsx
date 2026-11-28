@@ -109,11 +109,16 @@ export function LoyaltyManagement({
   const [updateBusy, setUpdateBusy] = useState(false);
 
   useEffect(() => {
-    setName(`${nombreConcesionario} Rewards`);
-    setDescription(`Programa de fidelización de ${nombreConcesionario} en MotoLedger.`);
-    setImage(null);
-    setResult(null);
-    setMintResult(null);
+    const timer = window.setTimeout(() => {
+      setName(`${nombreConcesionario} Rewards`);
+      setDescription(`Programa de fidelización de ${nombreConcesionario} en MotoLedger.`);
+      setImage(null);
+      setImagePreview(null);
+      setResult(null);
+      setMintResult(null);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [concesionario, nombreConcesionario]);
 
   useEffect(() => {
@@ -240,14 +245,21 @@ export function LoyaltyManagement({
   }, [client, concesionario, cluster, reloadProgram]);
 
   useEffect(() => {
-    if (!image) {
-      setImagePreview(null);
-      return;
-    }
+    if (!image) return;
 
-    const objectUrl = URL.createObjectURL(image);
-    setImagePreview(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setImagePreview(reader.result);
+      }
+    };
+    reader.readAsDataURL(image);
+
+    return () => {
+      if (reader.readyState === FileReader.LOADING) {
+        reader.abort();
+      }
+    };
   }, [image]);
 
   const supportedCluster = cluster === "devnet" || cluster === "mainnet";
@@ -687,7 +699,7 @@ export function LoyaltyManagement({
           </label>
           <label className="mt-3 block">
             <span className="mb-1 block text-[9px] font-semibold text-[#555e68]">Nueva imagen</span>
-            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setImage(event.target.files?.[0] ?? null)} disabled={updateBusy} className="block w-full rounded-lg border border-[#e2e5e8] px-2 py-2 text-[10px]" />
+            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { setImagePreview(null); setImage(event.target.files?.[0] ?? null); }} disabled={updateBusy} className="block w-full rounded-lg border border-[#e2e5e8] px-2 py-2 text-[10px]" />
           </label>
           {imagePreview && (
             <div className="mt-3 flex items-center gap-3">
@@ -764,7 +776,7 @@ export function LoyaltyManagement({
               </div>
               <label className="block">
                 <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Imagen del programa</span>
-                <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { setImage(event.target.files?.[0] ?? null); if (!mintResult) setResult(null); }} disabled={busy || !!mintResult} className="block w-full rounded-lg border border-[#e2e5e8] bg-white px-2 py-2 text-[10px] text-[#555e68] file:mr-2 file:rounded-md file:border-0 file:bg-[#fff0f1] file:px-2 file:py-1.5 file:text-[9px] file:font-semibold file:text-[#d90011]" />
+                <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { setImagePreview(null); setImage(event.target.files?.[0] ?? null); if (!mintResult) setResult(null); }} disabled={busy || !!mintResult} className="block w-full rounded-lg border border-[#e2e5e8] bg-white px-2 py-2 text-[10px] text-[#555e68] file:mr-2 file:rounded-md file:border-0 file:bg-[#fff0f1] file:px-2 file:py-1.5 file:text-[9px] file:font-semibold file:text-[#d90011]" />
                 <span className="mt-1 block text-[9px] text-[#a0a6ad]">PNG, JPG o WEBP · máximo 5 MB.</span>
                 {image && <span className="mt-1 block break-all text-[9px] font-medium text-[#555e68]">{image.name} · {(image.size / 1024 / 1024).toFixed(2)} MB</span>}
               </label>
