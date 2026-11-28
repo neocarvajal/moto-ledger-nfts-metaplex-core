@@ -466,8 +466,12 @@ export function RecognitionManagement({
             milestone,
           });
           assetAddress = built.asset;
-          await client.sendTransaction(built.instructions);
+          const result = await client.sendTransaction(built.instructions);
           emitted += 1;
+          notifyTransactionSuccess(
+            `Reconocimiento NFT del hito ${milestone} emitido para ${customer.name}.`,
+            result.context.signature
+          );
         } catch (issueError) {
           let confirmed = false;
           if (assetAddress) {
