@@ -407,7 +407,6 @@ Los siguientes enlaces corresponden a operaciones verificables de la demostraci�
 
 Estas referencias documentan la creación de la colección, la publicación de su metadata y la emisión de un reconocimiento a la wallet del cliente desde el flujo de hitos pendientes.
 
-**Diseño técnico:** [docs/metaplex-core-recognition-design.md](docs/metaplex-core-recognition-design.md).
 
 ## Seguridad
 
