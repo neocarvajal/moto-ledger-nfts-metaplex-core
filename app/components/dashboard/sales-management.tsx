@@ -108,6 +108,7 @@ export function SalesManagement({
 }) {
   const client = useAppClient();
   const connected = useConnectedWallet(client);
+  const connectedAccountAddress = connected?.account.address;
   const { cluster, getExplorerUrl } = useCluster();
   const [motorcycles, setMotorcycles] = useState<MotorcycleRecord[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
@@ -255,7 +256,7 @@ export function SalesManagement({
   }, [client, concesionario]);
 
   const loadCustomers = useCallback(async () => {
-    if (!connected?.account.address) {
+    if (!connectedAccountAddress) {
       setCustomers([]);
       setSelectedCustomerAddress("");
       setCedula("");
@@ -267,7 +268,7 @@ export function SalesManagement({
 
     setLoadingCustomers(true);
     try {
-      const ownerFilter = address(connected.account.address) as Base58EncodedBytes;
+      const ownerFilter = address(connectedAccountAddress) as Base58EncodedBytes;
       const discriminatorFilter = getBase58Decoder().decode(
         getAsociacionClienteDiscriminatorBytes()
       ) as Base58EncodedBytes;
@@ -293,7 +294,7 @@ export function SalesManagement({
         customerAddresses.map(async (customerAddress) => {
           try {
             const account = await client.registro.accounts.cliente.fetch(address(customerAddress));
-            return account.data.owner === connected.account.address
+            return account.data.owner === connectedAccountAddress
               ? { address: address(customerAddress).toString(), data: account.data }
               : null;
           } catch {
@@ -314,7 +315,7 @@ export function SalesManagement({
     } finally {
       setLoadingCustomers(false);
     }
-  }, [client, connected?.account.address, concesionario]);
+  }, [client, connectedAccountAddress, concesionario]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
