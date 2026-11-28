@@ -5,7 +5,7 @@ MotoLedger registra ventas de concesionarios en **Solana Devnet** y reconoce la 
 El foco de este proyecto es la creación y administración de colecciones Core y la emisión de reconocimientos NFT. La fidelización mediante Token-2022 es complementaria y no forma parte del flujo principal documentado aquí.
 
 <p align="center">
-  <img src="assets/moto-ledger-preview-.gif" alt="Dashboard de MotoLedger" width="100%">
+  <img src="assets/moto-ledger-dashboard.png" alt="Dashboard de MotoLedger" width="100%">
 </p>
 
 > **Red:** Solana Devnet  
