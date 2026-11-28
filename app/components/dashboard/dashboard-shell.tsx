@@ -5,6 +5,7 @@ import { ClusterSelect } from "../cluster-select";
 import { WalletButton } from "../wallet-button";
 import { DealershipWorkspace } from "./dealership-workspace";
 import { useAppClient } from "../../lib/client-provider";
+import { NotificationCenter } from "./notification-center";
 import { useCluster } from "../cluster-context";
 
 const navigation = [
@@ -243,6 +244,7 @@ export function DashboardShell() {
             <p className="mt-1 text-[12px] font-bold text-[#424950]">{page.title}</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            <NotificationCenter />
             <ClusterSelect />
             <WalletButton />
           </div>
