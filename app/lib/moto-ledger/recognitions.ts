@@ -50,6 +50,8 @@ export type IssuedRecognition = {
   customer: string;
   dealership: string;
   sale: string;
+  metadataUri: string;
+  imageUri: string;
 };
 
 const RPC_URLS: Record<ClusterMoniker, string> = {
@@ -240,13 +242,35 @@ export async function readIssuedRecognitions(
 ): Promise<IssuedRecognition[]> {
   const umi = createRecognitionUmi(cluster);
   const assets = await fetchAssetsByCollection(umi, publicKey(collection));
-  return assets.map((asset) => {
+  return Promise.all(assets.map(async (asset) => {
     const attributes = Object.fromEntries(
       (asset.attributes?.attributeList ?? []).map((item) => [
         item.key,
         item.value,
       ])
     );
+    const metadataUri = asset.uri;
+    let imageUri = "";
+    try {
+      const response = await fetch(metadataUri, {
+        headers: { Accept: "application/json" },
+      });
+      if (response.ok) {
+        const metadata = await response.json() as { image?: unknown };
+        if (typeof metadata.image === "string") {
+          imageUri = metadata.image;
+          if (imageUri.startsWith("ipfs://")) {
+            const gateway = process.env.NEXT_PUBLIC_GATEWAY_URL?.replace(/\/+$/, "");
+            imageUri = gateway
+              ? `${gateway}/ipfs/${imageUri.slice("ipfs://".length)}`
+              : "";
+          }
+          if (!imageUri.startsWith("https://")) imageUri = "";
+        }
+      }
+    } catch (metadataError) {
+      console.warn("No se pudo cargar la imagen del reconocimiento:", asset.publicKey, metadataError);
+    }
     return {
       address: asset.publicKey,
       owner: asset.owner,
@@ -254,8 +278,10 @@ export async function readIssuedRecognitions(
       customer: attributes.cliente ?? "",
       dealership: attributes.concesionario ?? "",
       sale: attributes.venta ?? "",
+      metadataUri,
+      imageUri,
     };
-  });
+  }));
 }
 
 export async function recognitionAlreadyIssued(
