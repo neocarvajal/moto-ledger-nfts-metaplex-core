@@ -84,7 +84,10 @@ export function MotorcycleCatalog({
   }, [client, concesionario]);
 
   useEffect(() => {
-    void loadMotorcycles();
+    const timer = window.setTimeout(() => {
+      void loadMotorcycles();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadMotorcycles, refreshKey]);
 
   const handleDelete = async (motorcycle: MotorcycleRecord) => {
