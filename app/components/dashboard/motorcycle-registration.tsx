@@ -17,7 +17,6 @@ import {
 
 export function MotorcycleRegistration({
   concesionario,
-  nombreConcesionario,
   onRegistered,
 }: {
   concesionario: string;
