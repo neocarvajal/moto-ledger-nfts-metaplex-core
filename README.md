@@ -293,7 +293,8 @@ Este módulo también permite reconocer compras que ocurrieron antes de crear la
 5. Para emitir uno, pulsa **Emitir reconocimiento** en la fila del cliente.
 6. Para procesar todos los que estén listos, pulsa **Emitir todos los disponibles** y aprueba las transacciones solicitadas por la wallet.
 
-Un reconocimiento está listo cuando el cliente tiene wallet destinataria y el hito tiene una URI de metadata configurada. Los clientes sin wallet o hitos sin metadata permanecen pendientes hasta completar esos requisitos.
+> [!WARNING]
+> Un reconocimiento está listo cuando el cliente tiene wallet destinataria y el hito tiene una URI de metadata configurada. Los clientes sin wallet o hitos sin metadata permanecen pendientes hasta completar esos requisitos.
 
 Antes de emitir, MotoLedger vuelve a consultar la colección para evitar duplicados. Los Assets ya existentes se omiten durante el procesamiento por lote.
 
@@ -394,15 +395,17 @@ npm run build
 
 ## Evidencia Devnet
 
-Añade aquí las direcciones y firmas de la colección y de los Assets NFT de la demostración cuando estén verificadas. No presentes transacciones de Token-2022 como evidencia de emisión NFT.
+Los siguientes enlaces corresponden a operaciones verificables de la demostración en Solana Devnet:
 
-| Evidencia | Estado |
+| Evidencia | Recurso |
 | --- | --- |
-| Programa MotoLedger | [Ver programa en Solana Explorer](https://explorer.solana.com/address/64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj?cluster=devnet) |
-| Colección Metaplex Core | Pendiente de añadir la dirección real. |
-| Asset NFT de reconocimiento | Pendiente de añadir la dirección real y sus Attributes. |
-| Venta con emisión automática | Pendiente de añadir la firma de la transacción. |
-| Emisión desde reconocimientos pendientes | Pendiente de añadir la firma y el Asset correspondiente. |
+| Programa MotoLedger | [Ver programa](https://explorer.solana.com/address/64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj?cluster=devnet) |
+| Colección Metaplex Core | [Ver colección](https://explorer.solana.com/address/96qVCAMTNx8KJnXFUt1BMGchps2TWMjed243HJwR1syn?cluster=devnet) |
+| Metadata de la colección | [Ver transacción de publicación](https://explorer.solana.com/tx/7aKYvu5XAFfzugHPP5Xi4NLYuj3XJyDxBJMJRmtrWAezPPJ5nazhEEfoAs2BcefzbvG9a96y2DqCqNn6P4DCAiV?cluster=devnet) |
+| NFT minteado al cliente por hito pendiente (transacción) | [Ver transacción de emisión](https://explorer.solana.com/tx/4QsbJYXu14CfTm7n329QonP4dm5taXxtkecue43qt89hd73Dg4XoeamfKbb9ZZwzvs9PPch6rQDE6jikaA8GTJoN?cluster=devnet) |
+| NFT minteado | [Ver Asset NFT](https://explorer.solana.com/address/HyC8HUK678LXM17e4QNcN77FUqnbbuxAdAYsU9XRFRmN?cluster=devnet) |
+
+Estas referencias documentan la creación de la colección, la publicación de su metadata y la emisión de un reconocimiento a la wallet del cliente desde el flujo de hitos pendientes.
 
 **Diseño técnico:** [docs/metaplex-core-recognition-design.md](docs/metaplex-core-recognition-design.md).
 
