@@ -645,15 +645,35 @@ export function RecognitionManagement({
         {issued.length === 0 ? (
           <p className="p-5 text-[10px] text-[#858d96]">Todavía no hay reconocimientos en esta colección.</p>
         ) : (
-          <div className="divide-y divide-[#f0f1f3]">
+          <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3">
             {issued.map((item) => (
-              <div key={item.address} className="flex flex-col gap-2 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold text-[#252a30]">Reconocimiento {item.milestone} {item.milestone === 1 ? "compra" : "compras"} · {customerName(item.customer)}</p>
-                  <p className="mt-1 font-mono text-[9px] text-[#858d96]">{shortAddress(item.address)} · Owner {shortAddress(item.owner)}</p>
+              <article key={item.address} className="overflow-hidden rounded-xl border border-[#e9ebee] bg-white">
+                {item.imageUri ? (
+                  <img
+                    src={item.imageUri}
+                    alt={`Reconocimiento del hito ${item.milestone}`}
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    className="aspect-square w-full bg-[#f7f8fa] object-cover"
+                  />
+                ) : (
+                  <div className="flex aspect-square w-full items-center justify-center bg-[#f7f8fa] text-[11px] font-semibold text-[#a0a6ad]">
+                    Imagen no disponible
+                  </div>
+                )}
+                <div className="space-y-2 p-4">
+                  <p className="text-[11px] font-bold text-[#252a30]">
+                    Reconocimiento {item.milestone} {item.milestone === 1 ? "compra" : "compras"}
+                  </p>
+                  <p className="text-[10px] text-[#68717b]">{customerName(item.customer)}</p>
+                  <p className="break-all font-mono text-[9px] text-[#9299a1]">Asset: {shortAddress(item.address)}</p>
+                  <p className="break-all font-mono text-[9px] text-[#9299a1]">Owner: {shortAddress(item.owner)}</p>
+                  <div className="flex flex-wrap gap-3 pt-1">
+                    <a href={explorerAddress(item.address, getExplorerUrl)} target="_blank" rel="noopener noreferrer" className="text-[9px] font-semibold text-[#e60012] underline decoration-dotted underline-offset-2">Ver Asset ↗</a>
+                    <a href={item.metadataUri} target="_blank" rel="noopener noreferrer" className="text-[9px] font-semibold text-[#68717b] underline decoration-dotted underline-offset-2">Ver metadata ↗</a>
+                  </div>
                 </div>
-                <a href={explorerAddress(item.address, getExplorerUrl)} target="_blank" rel="noopener noreferrer" className="text-[9px] font-semibold text-[#e60012] underline decoration-dotted underline-offset-2">Ver Asset en Explorer ↗</a>
-              </div>
+              </article>
             ))}
           </div>
         )}
