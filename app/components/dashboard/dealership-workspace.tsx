@@ -63,7 +63,8 @@ export function DealershipWorkspace({
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const timer = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const loadDealerships = useCallback(async () => {
@@ -112,7 +113,10 @@ export function DealershipWorkspace({
   }, [client, walletAddress]);
 
   useEffect(() => {
-    void loadDealerships();
+    const timer = window.setTimeout(() => {
+      void loadDealerships();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadDealerships]);
 
   const refreshDealership = useCallback(async (targetAddress: string) => {
@@ -134,9 +138,12 @@ export function DealershipWorkspace({
   // Each module has its own dealership selection. Entering a module
   // clears the previous selection so the user explicitly selects it again.
   useEffect(() => {
-    setDealership(null);
-    setAssociatedCustomerCount(null);
-    setLoadingSelectedDealership(false);
+    const timer = window.setTimeout(() => {
+      setDealership(null);
+      setAssociatedCustomerCount(null);
+      setLoadingSelectedDealership(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [activeModule]);
 
   const handleSelectDealership = useCallback(async (selectedAddress: string) => {
