@@ -10,7 +10,7 @@ Este repositorio documenta el flujo de colecciones Core, publicación de metadat
 
 > **Red de demostración:** Solana Devnet  
 > **Programa Anchor:** [64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj](https://explorer.solana.com/address/64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj?cluster=devnet)  
-> **Aplicación:** [MotoLedger](https://moto-ledger-token-2022.vercel.app/)
+> **Aplicación:** [MotoLedger](https://moto-ledger-nfts-metaplex-core.vercel.app/)
 
 ---
 
@@ -355,7 +355,7 @@ El cliente conserva la propiedad del NFT, pero no la autoridad de congelamiento.
 
 ## Probar la aplicación en Devnet
 
-1. Abre [MotoLedger](https://moto-ledger-token-2022.vercel.app/).
+1. Abre [MotoLedger](https://moto-ledger-nfts-metaplex-core.vercel.app/).
 2. Selecciona **Solana Devnet** y conecta la wallet owner de un concesionario de demostración.
 3. En **Reconocimientos NFT**, genera y sube la metadata de colección con la opción **Automática**.
 4. Pulsa **Crear colección Core** y aprueba la creación y el registro.
