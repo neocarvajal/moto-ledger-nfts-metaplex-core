@@ -169,6 +169,12 @@ export function RecognitionMilestoneUploader({
             <div key={milestone} className="rounded-lg border border-[#edf0f2] p-3">
               <p className="text-[10px] font-bold text-[#252a30]">Hito {milestone} · {LABELS[milestone].name}</p>
               <p className="mt-1 text-[9px] text-[#858d96]">{saved ? "Metadata configurada" : "JPG incluido en assets/recognitions"}</p>
+              <div
+                role="img"
+                aria-label={`Imagen del hito ${milestone}: ${LABELS[milestone].name}`}
+                className="mt-3 aspect-square w-full rounded-lg border border-[#edf0f2] bg-[#f7f8fa] bg-contain bg-center bg-no-repeat"
+                style={{ backgroundImage: `url(${JSON.stringify(saved?.imageUri || DEFAULT_IMAGES[milestone].src)})` }}
+              />
               <input type="file" accept="image/jpeg" onChange={(event) => setFiles((current) => ({ ...current, [milestone]: event.target.files?.[0] }))} className="mt-3 block w-full text-[9px] text-[#68717b] file:mr-2 file:rounded-md file:border-0 file:bg-[#f2f3f5] file:px-2 file:py-1.5 file:text-[9px] file:font-semibold" />
               {saved?.metadataUri && <a href={saved.metadataUri} target="_blank" rel="noopener noreferrer" className="mt-2 block break-all text-[9px] text-[#16845a] underline">Ver JSON en IPFS ↗</a>}
               <button type="button" onClick={() => void uploadOne(milestone)} disabled={busy} className="mt-3 rounded-md border border-[#e2e5e8] px-3 py-2 text-[9px] font-semibold text-[#555e68] disabled:opacity-40">Subir solo este hito</button>
