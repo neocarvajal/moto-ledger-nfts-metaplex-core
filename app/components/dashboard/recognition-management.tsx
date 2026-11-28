@@ -653,12 +653,11 @@ export function RecognitionManagement({
             {issued.map((item) => (
               <article key={item.address} className="overflow-hidden rounded-xl border border-[#e9ebee] bg-white">
                 {item.imageUri ? (
-                  <img
-                    src={item.imageUri}
-                    alt={`Reconocimiento del hito ${item.milestone}`}
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                    className="aspect-square w-full bg-[#f7f8fa] object-cover"
+                  <div
+                    role="img"
+                    aria-label={`Imagen del reconocimiento del hito ${item.milestone}`}
+                    className="aspect-square w-full bg-[#f7f8fa] bg-cover bg-center"
+                    style={{ backgroundImage: `url(${JSON.stringify(item.imageUri)})` }}
                   />
                 ) : (
                   <div className="flex aspect-square w-full items-center justify-center bg-[#f7f8fa] text-[11px] font-semibold text-[#a0a6ad]">
